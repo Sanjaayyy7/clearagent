@@ -1,0 +1,25 @@
+{
+  "name": "clearagent-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/api",
+    "packages/dashboard",
+    "packages/sdk",
+    "packages/mcp-server",
+    "packages/landing"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/api",
+    "dev:dashboard": "npm run dev --workspace=packages/dashboard",
+    "dev:landing": "npm run dev --workspace=packages/landing",
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace=packages/api",
+    "db:migrate": "npm run db:migrate --workspace=packages/api",
+    "seed": "npm run seed --workspace=packages/api",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
