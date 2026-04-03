@@ -3,8 +3,12 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import { Queue } from "bullmq";
-import IORedis from "ioredis";
+import { Redis as IORedis } from "ioredis";
 import { eventsRouter } from "./routes/events.js";
+import { jobsRouter } from "./routes/jobs.js";
+import { reviewsRouter } from "./routes/reviews.js";
+import { agentsRouter } from "./routes/agents.js";
+import { auditRouter } from "./routes/audit.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { startWorker, QUEUE_NAME } from "./workers/verify.worker.js";
 import { logger } from "./logger.js";
@@ -46,6 +50,10 @@ app.get("/v1/health", (_req, res) => {
 
 // ─── Protected routes ────────────────────────────────────────
 app.use("/v1/events", authMiddleware, eventsRouter);
+app.use("/v1/jobs", authMiddleware, jobsRouter);
+app.use("/v1/reviews", authMiddleware, reviewsRouter);
+app.use("/v1/agents", authMiddleware, agentsRouter);
+app.use("/v1/audit", authMiddleware, auditRouter);
 
 // ─── Error handler ───────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listEvents, type VerificationEvent, type EventsResponse } from "../lib/api.ts";
+import { listEvents, subscribeToEventStream, type VerificationEvent, type EventsResponse } from "../lib/api.ts";
 
 function StatusBadge({ status, decision }: { status: string; decision: string }) {
   const colors: Record<string, string> = {
@@ -34,20 +34,26 @@ export default function LiveFeed() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const res: EventsResponse = await listEvents({ limit: 50 });
+    // Initial load
+    listEvents({ limit: 50 })
+      .then((res: EventsResponse) => {
         setEvents(res.data);
         setTotal(res.pagination.total);
-      } catch (err) {
-        console.error("Failed to fetch events:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchEvents();
-    const interval = setInterval(fetchEvents, 3000);
-    return () => clearInterval(interval);
+      })
+      .catch((err) => console.error("Failed to fetch events:", err))
+      .finally(() => setLoading(false));
+
+    // Live updates via SSE (replaces 3s polling)
+    const cleanup = subscribeToEventStream((newEvent) => {
+      setEvents((prev) => {
+        // Prepend new event, keep most recent 50
+        const updated = [newEvent as VerificationEvent, ...prev].slice(0, 50);
+        return updated;
+      });
+      setTotal((prev) => prev + 1);
+    });
+
+    return cleanup;
   }, []);
 
   const approved = events.filter((e) => e.decision === "approved").length;
@@ -72,7 +78,7 @@ export default function LiveFeed() {
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 bg-brand-teal rounded-full animate-pulse" />
-          <span className="text-xs text-brand-muted">Auto-refreshing</span>
+          <span className="text-xs text-brand-muted">Live via SSE</span>
         </div>
       </div>
 

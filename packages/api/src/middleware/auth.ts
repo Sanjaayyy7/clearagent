@@ -6,9 +6,11 @@ import type { Request, Response, NextFunction } from "express";
  * Production: would hash-compare against api_keys table.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Accept key from Authorization header OR ?api_key= query param (required for EventSource/SSE)
   const authHeader = req.headers.authorization;
+  const queryKey = req.query.api_key as string | undefined;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader?.startsWith("Bearer ") && !queryKey) {
     res.status(401).json({
       error: {
         code: "authentication_required",
@@ -18,7 +20,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  const apiKey = authHeader.slice(7);
+  const apiKey = authHeader ? authHeader.slice(7) : queryKey!;
   const demoKey = process.env.DEMO_API_KEY || "ca_test_demo_key_clearagent_2026";
 
   if (apiKey !== demoKey) {

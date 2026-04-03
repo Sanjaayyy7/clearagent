@@ -1,6 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
-import postgres from "postgres";
+import { Redis as IORedis } from "ioredis";
 import { db, schema } from "../db/index.js";
 import { eq, desc } from "drizzle-orm";
 import { verifyTransaction, type TransactionInput } from "../verification/transaction.js";
@@ -10,11 +9,8 @@ import { logger } from "../logger.js";
 
 export const QUEUE_NAME = "verification";
 
-// Separate raw SQL client for updates (bypasses Drizzle's abstraction)
-const rawClient = postgres(process.env.DATABASE_URL || "postgresql://clearagent:clearagent@localhost:5432/clearagent");
-
 export interface VerificationJobData {
-  eventId: string;
+  jobId: string;
   orgId: string;
   agentId: string;
   eventType: string;
@@ -39,22 +35,25 @@ async function getLastHash(orgId: string): Promise<string | null> {
 
 async function processVerification(job: Job<VerificationJobData>): Promise<void> {
   const data = job.data;
-  const log = logger.child({ eventId: data.eventId, jobId: job.id });
+  const log = logger.child({ jobId: data.jobId, bullJobId: job.id });
   log.info("Processing verification");
+
+  // Mark job as processing
+  await db.update(schema.jobs).set({ status: "processing", updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));
 
   try {
     // Run verification
     const result = await verifyTransaction(data.inputPayload as unknown as TransactionInput);
 
     // Compute hashes
-    const occurredAt = new Date().toISOString();
+    const occurredAt = new Date();
     const inputHash = computeInputHash(data.inputPayload);
     const prevHash = await getLastHash(data.orgId);
     const contentHash = computeContentHash({
       inputHash,
       outputPayload: result,
       decision: result.decision,
-      occurredAt,
+      occurredAt: occurredAt.toISOString(),
     });
 
     // Evaluate oversight policies
@@ -65,34 +64,46 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
 
     const finalStatus = result.decision === "approved" ? "verified" : result.decision === "rejected" ? "failed" : "flagged";
 
-    // Update event via raw SQL (trigger allows pending → final transition)
-    await rawClient`
-      UPDATE verification_events
-      SET
-        status = ${finalStatus},
-        output_payload = ${JSON.stringify(result)}::jsonb,
-        decision = ${result.decision},
-        confidence = ${result.confidence.toString()},
-        reasoning = ${result.reasoning},
-        input_hash = ${inputHash},
-        content_hash = ${contentHash},
-        prev_hash = ${prevHash},
-        occurred_at = ${occurredAt},
-        requires_review = ${oversight.requiresReview},
-        eu_ai_act_articles = ${"{{12,14,19}}"}::text[]
-      WHERE id = ${data.eventId}
-    `;
+    // Calculate retention expiry
+    const retentionExpiresAt = new Date();
+    retentionExpiresAt.setDate(retentionExpiresAt.getDate() + data.retentionDays);
 
-    log.info({ decision: result.decision, confidence: result.confidence, requiresReview: oversight.requiresReview }, "Verification complete");
+    // EU-AI-ACT-GAP: Art. 12 — reasoning field is free text; no structured schema for machine-readable audit
+    // Single INSERT with complete data — genuine append-only (EU AI Act Art. 12)
+    const [event] = await db
+      .insert(schema.verificationEvents)
+      .values({
+        orgId: data.orgId,
+        agentId: data.agentId,
+        eventType: data.eventType,
+        eventCategory: data.eventCategory,
+        inputHash,
+        inputPayload: data.inputPayload,
+        outputPayload: result,
+        decision: result.decision,
+        confidence: result.confidence.toString(),
+        reasoning: result.reasoning,
+        sessionId: data.sessionId,
+        parentEventId: data.parentEventId,
+        sequenceNum: data.sequenceNum,
+        euAiActArticles: ["12", "14", "19"],
+        contentHash,
+        prevHash,
+        occurredAt,
+        retentionExpiresAt,
+        status: finalStatus,
+        requiresReview: oversight.requiresReview,
+      })
+      .returning();
+
+    // Mark job completed
+    await db.update(schema.jobs).set({ status: "completed", eventId: event.id, updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));
+
+    log.info({ eventId: event.id, decision: result.decision, confidence: result.confidence, requiresReview: oversight.requiresReview }, "Verification complete");
   } catch (err) {
     log.error({ err }, "Verification failed");
 
-    // Mark as failed
-    await rawClient`
-      UPDATE verification_events
-      SET status = 'failed', decision = 'rejected', reasoning = ${String(err)}
-      WHERE id = ${data.eventId}
-    `;
+    await db.update(schema.jobs).set({ status: "failed", error: String(err), updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));
   }
 }
 

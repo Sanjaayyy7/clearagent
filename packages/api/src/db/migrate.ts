@@ -21,12 +21,8 @@ async function runMigrations() {
     CREATE OR REPLACE FUNCTION enforce_verification_immutability()
     RETURNS trigger AS $$
     BEGIN
-      -- Allow the initial status transition from 'pending' to a final state
-      IF OLD.status = 'pending' AND NEW.status IN ('verified', 'failed', 'flagged') THEN
-        RETURN NEW;
-      END IF;
-      -- Block all other updates
-      RAISE EXCEPTION 'verification_events is append-only: updates blocked on finalized events (EU AI Act Art. 12)';
+      -- All updates blocked — events are inserted complete, never updated (EU AI Act Art. 12)
+      RAISE EXCEPTION 'verification_events is append-only: all updates blocked (EU AI Act Art. 12)';
     END;
     $$ LANGUAGE plpgsql;
   `;

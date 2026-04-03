@@ -192,6 +192,17 @@ export const auditExports = pgTable("audit_exports", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
 
+// ─── Jobs (async verification tracking) ──────────────────────
+export const jobs = pgTable("jobs", {
+  id: text("id").primaryKey(), // nanoid
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  status: text("status").notNull().default("queued"), // queued|processing|completed|failed
+  eventId: uuid("event_id").references(() => verificationEvents.id),
+  error: text("error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Integrity Checkpoints (Art. 12 + 19) ─────────────────────
 export const integrityCheckpoints = pgTable("integrity_checkpoints", {
   id: uuid("id").primaryKey().defaultRandom(),

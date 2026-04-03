@@ -16,8 +16,24 @@ export function computeInputHash(inputPayload: unknown): string {
 }
 
 /**
+ * Canonically serialize a value for hashing.
+ * Sorts object keys to ensure deterministic output regardless of insertion order
+ * (necessary because PostgreSQL JSONB storage reorders keys).
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const sorted = Object.keys(value as Record<string, unknown>)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${canonicalJson((value as Record<string, unknown>)[k])}`)
+    .join(",");
+  return `{${sorted}}`;
+}
+
+/**
  * Compute the content hash for a verification event.
  * This is the hash that forms the chain: hash(inputHash + outputPayload + decision + occurredAt).
+ * Uses canonical JSON serialization (sorted keys) to survive JSONB roundtrips.
  */
 export function computeContentHash(params: {
   inputHash: string;
@@ -27,7 +43,7 @@ export function computeContentHash(params: {
 }): string {
   const data = [
     params.inputHash,
-    JSON.stringify(params.outputPayload),
+    canonicalJson(params.outputPayload),
     params.decision,
     params.occurredAt,
   ].join("|");
