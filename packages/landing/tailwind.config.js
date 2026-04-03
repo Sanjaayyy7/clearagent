@@ -5,23 +5,20 @@ export default {
     extend: {
       colors: {
         ca: {
-          bg: "#03030a",
-          surface: "#080818",
-          "surface-2": "#0e0e24",
-          "surface-3": "#141430",
-          border: "#1e1e40",
-          accent: "#7c3aed",   // violet — brand
-          cta: "#f97316",       // orange — action only
-          verified: "#10b981",
-          flagged: "#f59e0b",
-          text: "#f0f0fa",
-          muted: "#6b6b90",
-          dim: "#4a4a6a",
+          bg: "#f0ede6",
+          surface: "#f8f6f0",
+          border: "#e0dbd2",
+          text: "#0a0a0a",
+          muted: "#8a8580",
+          dim: "#c0bbb4",
+          dark: "#0a0a0a",
+          verified: "#16a34a",
+          flagged: "#b45309",
         },
       },
       fontFamily: {
-        display: ['"Cormorant Garamond"', "Georgia", "serif"],
-        body: ['"DM Sans"', "system-ui", "sans-serif"],
+        display: ["Inter", "system-ui", "sans-serif"],
+        body: ["Inter", "system-ui", "sans-serif"],
         mono: ['"JetBrains Mono"', "Menlo", "monospace"],
       },
     },
