@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingScreen from "./LoadingScreen";
+import { SplineScene } from "./SplineScene";
 
 /* ── Typography constants ────────────────────────────────── */
 const FS = { fontFamily: "var(--font-sans)" } as const;
 const HEADING = { ...FS, fontWeight: 800, lineHeight: 0.92, letterSpacing: "-0.04em" } as const;
 const HERO_H  = { ...FS, fontWeight: 800, lineHeight: 0.88, letterSpacing: "-0.05em" } as const;
-const BODY    = { ...FS, fontWeight: 400, fontSize: 17, lineHeight: 1.65, letterSpacing: "-0.01em", color: "#888880" } as const;
+const BODY    = { ...FS, fontWeight: 400, fontSize: 17, lineHeight: 1.65, letterSpacing: "-0.01em", color: "#555555" } as const;
 
 /* ── Hooks ───────────────────────────────────────────────── */
 function useInView(threshold = 0.1): [React.RefObject<HTMLDivElement>, boolean] {
@@ -45,7 +46,7 @@ function useCounter(target: number, duration: number, active: boolean): number {
 function SLabel({ children, light }: { children: string; light?: boolean }) {
   return (
     <div className={light ? "section-label-light" : "section-label"}>
-      <span style={{ color: light ? "#3a3a38" : "#bbb8b0" }}>—</span>
+      <span style={{ color: light ? "#555555" : "#444444" }}>—</span>
       <span>{children}</span>
     </div>
   );
@@ -56,8 +57,8 @@ function H2({
 }: { line1: string; line2: string; size?: string; light?: boolean; mb?: number }) {
   return (
     <div style={{ marginBottom: mb }}>
-      <div style={{ ...HEADING, fontSize: size, color: light ? "#f5f2eb" : "#0a0a0a", display: "block" }}>{line1}</div>
-      <div style={{ ...HEADING, fontSize: size, color: light ? "#444440" : "#888880", display: "block" }}>{line2}</div>
+      <div style={{ ...HEADING, fontSize: size, color: light ? "#ffffff" : "#0a0a0a", display: "block" }}>{line1}</div>
+      <div style={{ ...HEADING, fontSize: size, color: light ? "#555555" : "#aaaaaa", display: "block" }}>{line2}</div>
     </div>
   );
 }
@@ -83,47 +84,6 @@ function CustomCursor() {
   return <div ref={ref} className={`custom-cursor${expanded ? " expanded" : ""}`} />;
 }
 
-/* ── Globe Canvas ────────────────────────────────────────── */
-function GlobeCanvas({ size = 480 }: { size?: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = size * dpr; canvas.height = size * dpr;
-    canvas.style.width = size + "px"; canvas.style.height = size + "px";
-    ctx.scale(dpr, dpr);
-    const N = 280, golden = Math.PI * (3 - Math.sqrt(5));
-    const chars = ["#", "✓", "→", "|", "─", "{", "}", "[", "]", "0", "1"];
-    type P = { ox: number; oy: number; oz: number; char: string };
-    const pts: P[] = Array.from({ length: N }, (_, i) => {
-      const y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(Math.max(0, 1 - y * y)), theta = golden * i;
-      return { ox: r * Math.cos(theta), oy: y, oz: r * Math.sin(theta), char: chars[i % chars.length] };
-    });
-    let angle = 0, raf: number;
-    const draw = () => {
-      if (document.hidden) { raf = requestAnimationFrame(draw); return; }
-      ctx.clearRect(0, 0, size, size);
-      const cx = size / 2, cy = size / 2, scale = size * 0.42;
-      const cos = Math.cos(angle), sin = Math.sin(angle);
-      pts.map((p) => ({ x: cx + (p.ox * cos - p.oz * sin) * scale, y: cy + p.oy * scale, z: p.ox * sin + p.oz * cos, char: p.char }))
-        .sort((a, b) => a.z - b.z)
-        .forEach((p) => {
-          if (p.z < -0.05) return;
-          const alpha = 0.09 + ((p.z + 1) / 2) * 0.62;
-          ctx.font = `${Math.round(9 + p.z * 4)}px "JetBrains Mono",monospace`;
-          ctx.fillStyle = `rgba(10,10,10,${alpha.toFixed(2)})`;
-          ctx.fillText(p.char, p.x, p.y);
-        });
-      angle += 0.004; raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, [size]);
-  return <canvas ref={canvasRef} style={{ display: "block", pointerEvents: "none" }} />;
-}
 
 /* ── Syntax highlighter ──────────────────────────────────── */
 function renderCode(code: string): string {
@@ -145,43 +105,50 @@ function Nav() {
     return () => window.removeEventListener("scroll", fn);
   }, []);
   const links = ["Compliance", "Process", "Developer"];
+  // Both floating and transparent: dark text on silver/light bg
+  const linkColor  = "#555555";
+  const linkHover  = "#000000";
+  const logoText   = "#000000";
+  const logoBg     = "#000000";
+  const logoStroke = "#ffffff";
   return (
     <nav className={`nav-base${floating ? " nav-floating" : ""}`}>
       <div style={{ ...W(), height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <a href="#" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none" }}>
-          <div className="logo-mark" style={{ width: 28, height: 28, borderRadius: 7, background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div className="logo-mark" style={{ width: 28, height: 28, borderRadius: 7, background: logoBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.3s" }}>
             <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-              <path d="M2 7L5.5 10.5L12 3.5" stroke="#f0ede6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 7L5.5 10.5L12 3.5" stroke={logoStroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <span style={{ ...FS, fontWeight: 700, fontSize: 17, color: "#0a0a0a", letterSpacing: "-0.02em" }}>ClearAgent</span>
+          <span style={{ ...FS, fontWeight: 700, fontSize: 17, color: logoText, letterSpacing: "-0.02em", transition: "color 0.3s" }}>ClearAgent</span>
         </a>
         <div className="hidden md:flex" style={{ gap: 32, alignItems: "center" }}>
           {links.map((l) => (
             <a key={l} href={`#${l.toLowerCase()}`}
-              style={{ ...FS, fontSize: 15, fontWeight: 400, letterSpacing: "-0.01em", color: "#888880", textDecoration: "none", transition: "color 0.15s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#0a0a0a")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#888880")}>{l}</a>
+              style={{ ...FS, fontSize: 15, fontWeight: 400, letterSpacing: "-0.01em", color: linkColor, textDecoration: "none", transition: "color 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = linkHover)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = linkColor)}>{l}</a>
           ))}
         </div>
         <div className="hidden md:flex" style={{ gap: 10, alignItems: "center" }}>
-          <a href="https://github.com/clearagent" className="btn-outline btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <a href="https://github.com/clearagent"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 18px", borderRadius: 9999, border: "1px solid rgba(0,0,0,0.18)", color: "#333333", fontSize: 14, fontFamily: "var(--font-sans)", textDecoration: "none", transition: "border-color 0.15s, color 0.15s" }}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
             GitHub
           </a>
           <a href="#developer" className="btn-black btn-sm">Get API Key</a>
         </div>
-        <button onClick={() => setOpen(!open)} style={{ background: "none", border: "none", color: "#888880", cursor: "pointer", display: "flex", alignItems: "center" }} className="md:hidden">
+        <button onClick={() => setOpen(!open)} style={{ background: "none", border: "none", color: "#555555", cursor: "pointer", display: "flex", alignItems: "center" }} className="md:hidden">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             {open ? <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/> : <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>}
           </svg>
         </button>
       </div>
       {open && (
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", background: "rgba(248,246,240,0.97)", padding: "16px 48px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-          {links.map((l) => <a key={l} href={`#${l.toLowerCase()}`} onClick={() => setOpen(false)} style={{ ...FS, fontSize: 15, color: "#888880", textDecoration: "none" }}>{l}</a>)}
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.08)", background: "rgba(255,255,255,0.96)", padding: "16px 48px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {links.map((l) => <a key={l} href={`#${l.toLowerCase()}`} onClick={() => setOpen(false)} style={{ ...FS, fontSize: 15, color: "#555555", textDecoration: "none" }}>{l}</a>)}
           <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
-            <a href="https://github.com/clearagent" className="btn-outline btn-sm" style={{ flex: 1, justifyContent: "center" }}>GitHub</a>
+            <a href="https://github.com/clearagent" style={{ flex: 1, justifyContent: "center", display: "inline-flex", alignItems: "center", padding: "9px 18px", borderRadius: 9999, border: "1px solid rgba(0,0,0,0.18)", color: "#333333", fontSize: 14, fontFamily: "var(--font-sans)", textDecoration: "none" }}>GitHub</a>
             <a href="#developer" className="btn-black btn-sm" style={{ flex: 1, justifyContent: "center" }} onClick={() => setOpen(false)}>Get API Key</a>
           </div>
         </div>
@@ -193,31 +160,31 @@ function Nav() {
 /* ── Hero ────────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "transparent", position: "relative" }}>
-      <div style={{ ...W(), position: "relative" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "58fr 42fr", gap: 48, alignItems: "center" }}>
-          {/* Left */}
-          <div>
-            <SLabel>AI Verification Infrastructure</SLabel>
-            <h1 style={{ ...HERO_H, fontSize: "clamp(60px, 7.5vw, 96px)", marginBottom: 28, overflow: "visible" }}>
-              <span style={{ display: "block", color: "#0a0a0a" }}>Verification</span>
-              <span style={{ display: "block", color: "#0a0a0a" }}>infrastructure.</span>
-            </h1>
-            <p style={{ ...BODY, maxWidth: 460, marginBottom: 36 }}>
-              Append-only audit trails, human oversight enforcement, and hash-verified
-              decision logs built to satisfy EU AI Act Articles 12, 14, and 19.
-            </p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 44 }}>
-              <a href="#developer" className="btn-black">Get started free <span className="arrow">→</span></a>
-              <a href="https://github.com/clearagent" className="btn-outline">Read the docs</a>
-            </div>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#bbb8b0", letterSpacing: "0.02em" }}>
-              80 events verified &nbsp;&nbsp;·&nbsp;&nbsp; 100% chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; 10 human reviews
-            </div>
+    <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "transparent", position: "relative", overflow: "hidden" }}>
+      {/* Spline Scene — full bleed, silver bg matches page bg, monochrome */}
+      <div className="hero-spline-container" style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
+        <SplineScene scene="https://prod.spline.design/d-QmlC-bFVNAgTfF/scene.splinecode" />
+      </div>
+      {/* Subtle left veil so text sits cleanly on silver */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(227,227,227,0.85) 0%, rgba(227,227,227,0.55) 45%, transparent 70%)", pointerEvents: "none" }} />
+      {/* Hero content */}
+      <div style={{ ...W(), position: "relative", zIndex: 2 }}>
+        <div style={{ maxWidth: 560 }}>
+          <SLabel>AI Verification Infrastructure</SLabel>
+          <h1 style={{ ...HERO_H, fontSize: "clamp(56px, 7vw, 88px)", marginBottom: 28, overflow: "visible" }}>
+            <span className="hero-gradient-text" style={{ display: "block" }}>Verification</span>
+            <span className="hero-gradient-text" style={{ display: "block" }}>infrastructure.</span>
+          </h1>
+          <p style={{ ...BODY, maxWidth: 420, marginBottom: 36 }}>
+            Append-only audit trails, human oversight enforcement, and hash-verified
+            decision logs built to satisfy EU AI Act Articles 12, 14, and 19.
+          </p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 44 }}>
+            <a href="#developer" className="btn-black">Get started free <span className="arrow">→</span></a>
+            <a href="https://github.com/clearagent" className="btn-outline">Read the docs</a>
           </div>
-          {/* Right — Globe */}
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-            <GlobeCanvas size={460} />
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888888", letterSpacing: "0.02em" }}>
+            80 events verified &nbsp;&nbsp;·&nbsp;&nbsp; 100% chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; 10 human reviews
           </div>
         </div>
       </div>
@@ -270,7 +237,7 @@ function HashChainDemo() {
 
   const arrowColor = (i: number) =>
     (state === "broken" || state === "detected") && i >= 2 ? "#ef4444" :
-    state === "restoring" || state === "restored" ? "#22c55e" : "#bbb8b0";
+    state === "restoring" || state === "restored" ? "#22c55e" : "#555555";
 
   const btnLabel = () => ({
     idle: "Simulate tamper attack →", injecting: "Injecting corrupt hash...",
@@ -279,19 +246,21 @@ function HashChainDemo() {
   }[state]);
 
   const btnBg = () => ({
-    idle: "#0a0a0a", injecting: "#888880", broken: "#888880",
+    idle: "#ffffff", injecting: "#555555", broken: "#555555",
     detected: "#dc2626", restoring: "#3b82f6", restored: "#16a34a",
   }[state]);
 
+  const btnColor = () => state === "idle" ? "#000000" : "#ffffff";
+
   return (
-    <section style={{ background: "#f5f2eb", padding: "64px 0", overflow: "hidden" }}>
+    <section style={{ background: "transparent", padding: "64px 0", overflow: "hidden" }}>
       <div style={W()}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 24, marginBottom: 40 }}>
           <div>
             <SLabel>Integrity Demo</SLabel>
             <div style={{ ...HEADING, fontSize: "clamp(28px, 3.5vw, 40px)", color: "#0a0a0a" }}>Hash chain tamper detection.</div>
-            <div style={{ ...HEADING, fontSize: "clamp(28px, 3.5vw, 40px)", color: "#888880" }}>Live. Interactive.</div>
+            <div style={{ ...HEADING, fontSize: "clamp(28px, 3.5vw, 40px)", color: "#aaaaaa" }}>Live. Interactive.</div>
           </div>
           <div style={{ minHeight: 36, display: "flex", alignItems: "center" }}>
             {state === "detected" && (
@@ -315,15 +284,15 @@ function HashChainDemo() {
             <Fragment key={block.id}>
               {i > 0 && (
                 <div className="chain-arrow">
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#bbb8b0", whiteSpace: "nowrap" }}>prev:{CHAIN_BLOCKS[i - 1].hash}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#555555", whiteSpace: "nowrap" }}>prev:{CHAIN_BLOCKS[i - 1].hash}</span>
                   <span style={{ color: arrowColor(i), fontSize: 16, transition: "color 0.3s" }}>→</span>
                 </div>
               )}
               <div className={blockClass(i)}>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#aaa8a0", marginBottom: 10 }}>#{block.id}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#555555", marginBottom: 10 }}>#{block.id}</div>
                 <div style={{ ...FS, fontWeight: 600, fontSize: 14, color: "#0a0a0a", letterSpacing: "-0.01em", marginBottom: 3 }}>{block.agent}</div>
-                <div style={{ ...FS, fontSize: 13, color: "#888880", marginBottom: 12 }}>{block.event}</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: (state !== "idle" && state !== "restoring" && state !== "restored") && i === 1 ? "#dc2626" : "#aaa8a0", marginBottom: 10, transition: "color 0.3s" }}>
+                <div style={{ ...FS, fontSize: 13, color: "#666666", marginBottom: 12 }}>{block.event}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: (state !== "idle" && state !== "restoring" && state !== "restored") && i === 1 ? "#dc2626" : "#555555", marginBottom: 10, transition: "color 0.3s" }}>
                   sha:{hashOf(i, block.hash)}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -334,21 +303,21 @@ function HashChainDemo() {
           ))}
           {/* Pending block */}
           <div className="chain-arrow">
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#bbb8b0", whiteSpace: "nowrap" }}>prev:{CHAIN_BLOCKS[3].hash}</span>
-            <span style={{ color: "#bbb8b0", fontSize: 16 }}>→</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#555555", whiteSpace: "nowrap" }}>prev:{CHAIN_BLOCKS[3].hash}</span>
+            <span style={{ color: "#555555", fontSize: 16 }}>→</span>
           </div>
-          <div style={{ background: "transparent", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: 12, padding: "20px", minWidth: 140, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#bbb8b0" }}>next event...</span>
+          <div style={{ background: "transparent", border: "1px dashed rgba(255,255,255,0.07)", borderRadius: 12, padding: "20px", minWidth: 140, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#555555" }}>next event...</span>
           </div>
         </div>
 
         {/* Action */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 28, flexWrap: "wrap", gap: 16 }}>
-          <p style={{ ...FS, fontSize: 13, color: "#aaa8a0" }}>
+          <p style={{ ...FS, fontSize: 13, color: "#555555" }}>
             {state === "idle" ? "Click to simulate a SHA-256 hash tampering attack on block #002" : ""}
           </p>
           <button onClick={runTamper} disabled={state !== "idle"}
-            style={{ ...FS, fontWeight: 500, fontSize: 14, letterSpacing: "-0.01em", background: btnBg(), color: "#f5f2eb", border: "none", borderRadius: 9999, padding: "11px 22px", cursor: state === "idle" ? "pointer" : "not-allowed", transition: "background 0.4s ease" }}>
+            style={{ ...FS, fontWeight: 500, fontSize: 14, letterSpacing: "-0.01em", background: btnBg(), color: btnColor(), border: "none", borderRadius: 9999, padding: "11px 22px", cursor: state === "idle" ? "pointer" : "not-allowed", transition: "background 0.4s ease, color 0.4s ease" }}>
             {btnLabel()}
           </button>
         </div>
@@ -361,34 +330,34 @@ function HashChainDemo() {
 
 const ChainSVG = () => (
   <svg width="120" height="72" viewBox="0 0 120 72" fill="none">
-    <rect x="4" y="20" width="32" height="24" rx="3" stroke="#0a0a0a" strokeWidth="1"/>
-    <text x="9" y="34" fontFamily="JetBrains Mono" fontSize="7" fill="#0a0a0a">#a3f4</text>
-    <text x="9" y="43" fontFamily="JetBrains Mono" fontSize="6" fill="#aaa8a0">evt_001</text>
-    <path d="M36 32 L47 32" stroke="#bbb8b0" strokeWidth="1"/>
-    <text x="40" y="29" fontFamily="JetBrains Mono" fontSize="9" fill="#bbb8b0">→</text>
-    <rect x="47" y="20" width="32" height="24" rx="3" stroke="#0a0a0a" strokeWidth="1"/>
-    <text x="52" y="34" fontFamily="JetBrains Mono" fontSize="7" fill="#0a0a0a">#9e1b</text>
-    <text x="52" y="43" fontFamily="JetBrains Mono" fontSize="6" fill="#aaa8a0">evt_002</text>
-    <path d="M79 32 L90 32" stroke="#bbb8b0" strokeWidth="1"/>
-    <text x="83" y="29" fontFamily="JetBrains Mono" fontSize="9" fill="#bbb8b0">→</text>
-    <rect x="90" y="20" width="26" height="24" rx="3" stroke="#bbb8b0" strokeWidth="1" strokeDasharray="2 2"/>
-    <text x="96" y="34" fontFamily="JetBrains Mono" fontSize="8" fill="#bbb8b0">···</text>
+    <rect x="4" y="20" width="32" height="24" rx="3" stroke="rgba(255,255,255,0.35)" strokeWidth="1"/>
+    <text x="9" y="34" fontFamily="JetBrains Mono" fontSize="7" fill="rgba(255,255,255,0.7)">#a3f4</text>
+    <text x="9" y="43" fontFamily="JetBrains Mono" fontSize="6" fill="#555555">evt_001</text>
+    <path d="M36 32 L47 32" stroke="#555555" strokeWidth="1"/>
+    <text x="40" y="29" fontFamily="JetBrains Mono" fontSize="9" fill="#555555">→</text>
+    <rect x="47" y="20" width="32" height="24" rx="3" stroke="rgba(255,255,255,0.35)" strokeWidth="1"/>
+    <text x="52" y="34" fontFamily="JetBrains Mono" fontSize="7" fill="rgba(255,255,255,0.7)">#9e1b</text>
+    <text x="52" y="43" fontFamily="JetBrains Mono" fontSize="6" fill="#555555">evt_002</text>
+    <path d="M79 32 L90 32" stroke="#555555" strokeWidth="1"/>
+    <text x="83" y="29" fontFamily="JetBrains Mono" fontSize="9" fill="#555555">→</text>
+    <rect x="90" y="20" width="26" height="24" rx="3" stroke="#333333" strokeWidth="1" strokeDasharray="2 2"/>
+    <text x="96" y="34" fontFamily="JetBrains Mono" fontSize="8" fill="#555555">···</text>
   </svg>
 );
 
 const OversightSVG = () => (
   <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-    <circle cx="28" cy="24" r="11" stroke="#0a0a0a" strokeWidth="1"/>
-    <path d="M10 64 C10 48 46 48 46 64" stroke="#0a0a0a" strokeWidth="1" fill="none"/>
-    <circle cx="54" cy="18" r="10" fill="white" stroke="#0a0a0a" strokeWidth="1"/>
-    <path d="M50 18 L53 21 L59 15" stroke="#0a0a0a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="28" cy="24" r="11" stroke="rgba(255,255,255,0.35)" strokeWidth="1"/>
+    <path d="M10 64 C10 48 46 48 46 64" stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none"/>
+    <circle cx="54" cy="18" r="10" fill="#1c1c19" stroke="rgba(255,255,255,0.35)" strokeWidth="1"/>
+    <path d="M50 18 L53 21 L59 15" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
 const ExportSVG = () => (
   <svg width="72" height="80" viewBox="0 0 72 80" fill="none">
-    <path d="M36 8 L60 18 L60 44 C60 60 36 72 36 72 C36 72 12 60 12 44 L12 18 Z" stroke="#0a0a0a" strokeWidth="1" fill="none"/>
-    <path d="M26 40 L32 46 L48 32" stroke="#0a0a0a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M36 8 L60 18 L60 44 C60 60 36 72 36 72 C36 72 12 60 12 44 L12 18 Z" stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none"/>
+    <path d="M26 40 L32 46 L48 32" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -414,7 +383,7 @@ function Capabilities() {
               style={{ display: "grid", gridTemplateColumns: "56px 1fr 150px", alignItems: "flex-start", padding: "52px 0", borderBottom: "1px solid rgba(0,0,0,0.08)", gap: 0 }}
             >
               {/* Mono number */}
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#bbb8b0", letterSpacing: "0.05em", paddingTop: 4, lineHeight: 1 }}>{f.num}</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#333333", letterSpacing: "0.05em", paddingTop: 4, lineHeight: 1 }}>{f.num}</span>
               {/* Content */}
               <div style={{ paddingRight: 48 }}>
                 <h3 style={{ ...FS, fontWeight: 700, fontSize: 22, letterSpacing: "-0.02em", color: "#0a0a0a", lineHeight: 1.2, marginBottom: 12 }}>{f.title}</h3>
@@ -514,11 +483,11 @@ function Process() {
             {PROCESS_STEPS.map((s, i) => (
               <div key={i} className={`process-step${active === i ? " active" : ""}`} onClick={() => setActive(i)}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: active === i ? "rgba(255,255,255,0.35)" : "#333330", lineHeight: 1, paddingTop: 4, minWidth: 18 }}>{s.roman}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: active === i ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.18)", lineHeight: 1, paddingTop: 4, minWidth: 18 }}>{s.roman}</span>
                   <div>
                     <div style={{
                       ...FS, fontWeight: active === i ? 700 : 400, fontSize: 20, letterSpacing: "-0.02em",
-                      color: active === i ? "#f5f2eb" : "#3a3a38",
+                      color: active === i ? "#ffffff" : "#444444",
                       lineHeight: 1.2,
                       textDecoration: active === i ? "underline" : "none",
                       textUnderlineOffset: 8,
@@ -527,7 +496,7 @@ function Process() {
                       transition: "color 0.2s, font-weight 0.1s",
                     }}>{s.title}</div>
                     {active === i && (
-                      <div className="fade-in-up" style={{ ...FS, fontSize: 15, color: "#888880", lineHeight: 1.6, letterSpacing: "-0.01em", maxWidth: 340, marginTop: 10 }}>{s.desc}</div>
+                      <div className="fade-in-up" style={{ ...FS, fontSize: 15, color: "#888888", lineHeight: 1.6, letterSpacing: "-0.01em", maxWidth: 340, marginTop: 10 }}>{s.desc}</div>
                     )}
                   </div>
                 </div>
@@ -573,9 +542,9 @@ function ComplianceStats() {
               record-keeping. Enforcement begins August 2026.
             </p>
           </div>
-          {/* Status panel — no padding at root, rows have own padding */}
+          {/* Status panel */}
           <div className={`reveal${visible ? " in" : ""} reveal-delay-2`}
-            style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(0,0,0,0.05)" }}>
+            style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 16, overflow: "hidden" }}>
             {stats.map((s, i) => (
               <div key={i} style={{ padding: "20px 24px", borderBottom: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "flex-start", gap: 14 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.dot, marginTop: 6, flexShrink: 0 }} />
@@ -584,7 +553,7 @@ function ComplianceStats() {
                     <span style={{ ...FS, fontWeight: 700, fontSize: 17, color: "#0a0a0a" }}>{s.value} </span>
                     <span style={{ ...FS, fontWeight: 600, fontSize: 17, color: "#0a0a0a" }}>{s.label}</span>
                   </div>
-                  <div style={{ ...FS, fontSize: 14, color: "#aaa8a0", marginTop: 2 }}>{s.sub}</div>
+                  <div style={{ ...FS, fontSize: 14, color: "#888888", marginTop: 2 }}>{s.sub}</div>
                 </div>
               </div>
             ))}
@@ -621,10 +590,10 @@ function LiveMetrics() {
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
-              <span style={{ ...FS, fontSize: 14, color: "#888880" }}>Live</span>
+              <span style={{ ...FS, fontSize: 14, color: "#888888" }}>Live</span>
             </div>
-            <span style={{ color: "#d4d0c8" }}>|</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888880" }}>{time}</span>
+            <span style={{ color: "#333333" }}>|</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888888" }}>{time}</span>
           </div>
           <SLabel>Live Metrics</SLabel>
           <H2 line1="Real-time" line2="verification data." size="clamp(48px, 6vw, 72px)" mb={0} />
@@ -635,7 +604,7 @@ function LiveMetrics() {
               <div style={{ fontFamily: c.mono ? "var(--font-mono)" : "var(--font-sans)", fontWeight: 800, fontSize: c.mono ? "clamp(36px,4vw,52px)" : "clamp(60px,8vw,96px)", color: "#0a0a0a", letterSpacing: c.mono ? "0.02em" : "-0.03em", lineHeight: 0.88, marginBottom: 14 }}>
                 {c.value}
               </div>
-              <div style={{ ...FS, fontSize: 16, color: "#888880", letterSpacing: "-0.01em" }}>{c.label}</div>
+              <div style={{ ...FS, fontSize: 16, color: "#888888", letterSpacing: "-0.01em" }}>{c.label}</div>
             </div>
           ))}
         </div>
@@ -664,7 +633,7 @@ function Tile({ name, cat }: { name: string; cat: string }) {
   return (
     <div className="integration-tile">
       <div style={{ ...FS, fontWeight: 600, fontSize: 14, color: "#0a0a0a", letterSpacing: "-0.01em", lineHeight: 1.2 }}>{name}</div>
-      <div style={{ ...FS, fontSize: 12, color: "#aaa8a0", lineHeight: 1 }}>{cat}</div>
+      <div style={{ ...FS, fontSize: 12, color: "#666666", lineHeight: 1 }}>{cat}</div>
     </div>
   );
 }
@@ -726,7 +695,7 @@ function EUAIAct() {
               {ARTICLES[active].items.map((item, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#f0ede6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
                   <span style={{ ...BODY, fontSize: 15, maxWidth: "none" }}>{item}</span>
                 </div>
@@ -803,13 +772,13 @@ function Developer() {
           </div>
         </div>
         <div className={`reveal${visible ? " in" : ""} reveal-delay-2`} style={{ marginTop: 28, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-          <p style={{ ...FS, fontSize: 14, color: "#888880", letterSpacing: "-0.01em" }}>Available in TypeScript, Python, and REST. MIT licensed.</p>
+          <p style={{ ...FS, fontSize: 14, color: "#888888", letterSpacing: "-0.01em" }}>Available in TypeScript, Python, and REST. MIT licensed.</p>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <a href="https://github.com/clearagent" className="btn-black btn-sm">View full docs</a>
-            <span style={{ color: "#d4d0c8", userSelect: "none" }}>|</span>
-            <a href="https://github.com/clearagent" style={{ ...FS, fontSize: 14, color: "#888880", textDecoration: "none", letterSpacing: "-0.01em" }}
+            <span style={{ color: "#333333", userSelect: "none" }}>|</span>
+            <a href="https://github.com/clearagent" style={{ ...FS, fontSize: 14, color: "#888888", textDecoration: "none", letterSpacing: "-0.01em" }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#0a0a0a")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#888880")}>View on GitHub</a>
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#888888")}>View on GitHub</a>
           </div>
         </div>
       </div>
@@ -817,56 +786,97 @@ function Developer() {
   );
 }
 
-/* ── CTA Card + Footer ───────────────────────────────────── */
-function CTACard() {
-  const [ref, visible] = useInView();
-  return (
-    <section className="section" style={{ background: "transparent" }}>
-      <div style={{ ...W(), maxWidth: 1100 }}>
-        <div ref={ref} className={`reveal${visible ? " in" : ""}`}
-          style={{ border: "1px solid rgba(0,0,0,0.07)", borderRadius: 24, background: "white", overflow: "hidden", display: "grid", gridTemplateColumns: "55fr 45fr", minHeight: 340 }}>
-          <div style={{ padding: "60px 56px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <SLabel>Get started</SLabel>
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ ...HEADING, fontSize: "clamp(32px,4vw,48px)", color: "#0a0a0a" }}>Start verifying</div>
-              <div style={{ ...HEADING, fontSize: "clamp(32px,4vw,48px)", color: "#888880" }}>your AI agents today.</div>
-            </div>
-            <p style={{ ...BODY, fontSize: 16, marginBottom: 32, maxWidth: 360 }}>Free tier: 1,000 events/month. No credit card required.</p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <a href="#developer" className="btn-black">Get API Key <span className="arrow">→</span></a>
-              <a href="https://github.com/clearagent" className="btn-outline">View docs</a>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", overflow: "hidden", position: "relative", background: "linear-gradient(135deg, #f8f6f0 0%, #ede9e0 100%)" }}>
-            <div style={{ position: "absolute", right: -40, top: "50%", transform: "translateY(-50%)" }}>
-              <GlobeCanvas size={380} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
+/* ── Footer ──────────────────────────────────────────────── */
 function Footer() {
   return (
-    <footer style={{ background: "transparent", borderTop: "1px solid rgba(0,0,0,0.07)", padding: "28px 48px" }}>
+    <footer style={{ background: "transparent", borderTop: "1px solid rgba(0,0,0,0.08)", padding: "28px 48px" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <div style={{ width: 22, height: 22, borderRadius: 6, background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#f0ede6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
-          <span style={{ ...FS, fontSize: 13, color: "#bbb8b0", fontWeight: 500 }}>© 2026 ClearAgent, Inc.</span>
+          <span style={{ ...FS, fontSize: 13, color: "#666666", fontWeight: 500 }}>© 2026 ClearAgent, Inc.</span>
         </div>
         <div style={{ display: "flex", gap: 24 }}>
           {["Privacy", "Terms", "GitHub", "Status"].map((l) => (
-            <a key={l} href="#" style={{ ...FS, fontSize: 13, color: "#bbb8b0", textDecoration: "none", transition: "color 0.15s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#888880")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#bbb8b0")}>{l}</a>
+            <a key={l} href="#" style={{ ...FS, fontSize: 13, color: "#666666", textDecoration: "none", transition: "color 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#aaaaaa")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#666666")}>{l}</a>
           ))}
         </div>
       </div>
     </footer>
+  );
+}
+
+/* ── Live Verification Feed ──────────────────────────────── */
+const VERIFY_EVENTS = [
+  { agent: "payment-agent", event: "transfer $9,500",   conf: 97, hash: "a3f4b2c1", status: "verified" },
+  { agent: "risk-agent",    event: "risk evaluation",   conf: 72, hash: "9e1b7a3d", status: "review"   },
+  { agent: "audit-agent",   event: "log record",        conf: 99, hash: "7c2d8f5e", status: "verified" },
+  { agent: "comp-agent",    event: "export audit",      conf: 88, hash: "3b9a1c6f", status: "verified" },
+  { agent: "trade-agent",   event: "execute order",     conf: 61, hash: "f2e8d4a0", status: "review"   },
+  { agent: "hr-agent",      event: "access PII data",   conf: 43, hash: "c1b5e9d7", status: "flagged"  },
+] as const;
+
+function LiveVerificationFeed() {
+  const [ref, visible] = useInView();
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [eventCount, setEventCount] = useState(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => {
+      setActiveIdx((i) => (i + 1) % VERIFY_EVENTS.length);
+      setEventCount((n) => n + 1);
+    }, 1800);
+    return () => clearInterval(id);
+  }, [visible]);
+
+  return (
+    <section className="section" style={{ background: "transparent" }}>
+      <div style={W()}>
+        <div ref={ref} className={`reveal${visible ? " in" : ""}`}>
+          <SLabel>Interactive Demo</SLabel>
+          <H2 line1="Touch the future" line2="of AI verification." mb={48} />
+        </div>
+        <div className="verify-feed-grid">
+          {VERIFY_EVENTS.map((ev, i) => {
+            const isActive = i === activeIdx;
+            const statusColor =
+              ev.status === "verified" ? "#22c55e" :
+              ev.status === "review"   ? "#f59e0b" : "#ef4444";
+            return (
+              <div key={i} className={`verify-card${isActive ? " active" : ""}`}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#888888" }}>
+                    evt_{String(eventCount * VERIFY_EVENTS.length + i + 1).padStart(3, "0")}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: statusColor, opacity: isActive ? 1 : 0.5 }} />
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: statusColor }}>{ev.status}</span>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, marginBottom: 4 }}>
+                  <div style={{ ...FS, fontWeight: 600, fontSize: 14, color: "#0a0a0a", letterSpacing: "-0.01em" }}>{ev.agent}</div>
+                  <div style={{ ...FS, fontSize: 12, color: "#888888", marginTop: 2 }}>{ev.event}</div>
+                </div>
+                <div className="verify-bar-bg">
+                  <div className="verify-bar-fill" style={{ width: isActive ? `${ev.conf}%` : "0%", background: statusColor }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#888888" }}>sha:{ev.hash}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#888888" }}>{ev.conf}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888888", letterSpacing: "0.02em", marginTop: 28 }}>
+          Live verification stream &nbsp;·&nbsp; {VERIFY_EVENTS.length} agents monitored &nbsp;·&nbsp; Real-time confidence scoring
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -885,13 +895,13 @@ export default function App() {
           <Hero />
           <HashChainDemo />
           <Capabilities />
+          <LiveVerificationFeed />
           <Process />
           <ComplianceStats />
           <LiveMetrics />
           <Integrations />
           <EUAIAct />
           <Developer />
-          <CTACard />
           <Footer />
         </motion.div>
       )}

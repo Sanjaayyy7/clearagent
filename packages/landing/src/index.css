@@ -11,32 +11,31 @@
 
 /* ── Design Tokens ───────────────────────────────────────── */
 :root {
-  --bg: #f0ede6;
-  --surface: #f8f6f0;
-  --border: rgba(0,0,0,0.08);
-  --border-med: rgba(0,0,0,0.06);
-  --text: #0a0a0a;
-  --text-muted: #888880;
-  --text-dim: #bbb8b0;
-  --text-faint: #aaa8a0;
-  --dark-bg: #0a0a0a;
-  --dark-text: #f5f2eb;
-  --dark-muted: #555550;
-  --dark-dim: #333330;
-  --verified: #22c55e;
-  --font-sans: "Geist Sans", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", Menlo, monospace;
+  --bg:           #e3e3e3;   /* silver/pearl — matches Spline scene bg */
+  --surface:      #ececec;
+  --surface-2:    #f2f2f2;
+  --surface-3:    #f8f8f8;
+  --border:       rgba(0,0,0,0.08);
+  --border-light: rgba(0,0,0,0.05);
+  --text:         #0a0a0a;
+  --text-muted:   #555555;
+  --text-dim:     #888888;
+  --text-faint:   #aaaaaa;
+  --text-label:   #777777;
+  --dark-bg:      #111111;   /* Process section — dark stripe */
+  --dark-text:    #ffffff;
+  --dark-muted:   #888888;
+  --dark-dim:     #555555;
+  --verified:     #22c55e;
+  --font-sans:    "Geist Sans", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", Menlo, monospace;
 }
 
 /* ── Base ────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
-  background-color: #f0ede6;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-blend-mode: multiply;
-  background-size: 200px 200px;
-  background-attachment: fixed;
+  background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -50,10 +49,10 @@ body {
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
 
 /* ── Selection ───────────────────────────────────────────── */
-::selection { background: rgba(10,10,10,0.1); color: var(--text); }
+::selection { background: rgba(0,0,0,0.12); color: var(--text); }
 
 /* ── Custom Cursor ───────────────────────────────────────── */
 @media (hover: hover) and (pointer: fine) {
@@ -91,12 +90,12 @@ body {
   top: 14px;
   left: 20px;
   right: 20px;
-  background: rgba(255,255,255,0.88);
+  background: rgba(255,255,255,0.94);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(0,0,0,0.07);
+  border: 1px solid rgba(0,0,0,0.06);
   border-radius: 9999px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 32px rgba(0,0,0,0.18);
 }
 
 /* ── Buttons ─────────────────────────────────────────────── */
@@ -104,8 +103,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--text);
-  color: #f5f2eb;
+  background: #0a0a0a;
+  color: #ffffff;
   border: none;
   border-radius: 9999px;
   padding: 13px 26px;
@@ -128,8 +127,8 @@ body {
   align-items: center;
   gap: 8px;
   background: transparent;
-  color: var(--text);
-  border: 1px solid rgba(0,0,0,0.18);
+  color: #0a0a0a;
+  border: 1px solid rgba(0,0,0,0.2);
   border-radius: 9999px;
   padding: 13px 26px;
   font-family: var(--font-sans);
@@ -142,7 +141,7 @@ body {
   transition: border-color 0.15s;
   white-space: nowrap;
 }
-.btn-outline:hover { border-color: rgba(0,0,0,0.4); }
+.btn-outline:hover { border-color: rgba(0,0,0,0.45); }
 .btn-sm { padding: 9px 18px; font-size: 14px; }
 
 /* ── Logo stamp ──────────────────────────────────────────── */
@@ -242,7 +241,7 @@ body {
 
 /* ── Integration Tiles ───────────────────────────────────── */
 .integration-tile {
-  background: #ffffff;
+  background: rgba(0,0,0,0.05);
   border: 1px solid rgba(0,0,0,0.08);
   border-radius: 10px;
   padding: 12px 18px;
@@ -280,10 +279,10 @@ body {
   border-left: 2px solid transparent;
 }
 .process-step.active {
-  background: rgba(255,255,255,0.04);
-  border-left-color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.05);
+  border-left-color: rgba(255,255,255,0.5);
 }
-.process-step:not(.active):hover { background: rgba(255,255,255,0.02); }
+.process-step:not(.active):hover { background: rgba(255,255,255,0.03); }
 
 /* ── Developer Tabs ──────────────────────────────────────── */
 .dev-tab {
@@ -291,7 +290,7 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--text-dim);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -300,7 +299,7 @@ body {
   letter-spacing: -0.01em;
 }
 .dev-tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--text); }
-.dev-tab:not(.active):hover { color: var(--text); }
+.dev-tab:not(.active):hover { color: var(--text-muted); }
 
 /* ── Article Pills ───────────────────────────────────────── */
 .article-pill {
@@ -312,17 +311,17 @@ body {
   font-size: 13px;
   cursor: pointer;
   border: 1px solid rgba(0,0,0,0.1);
-  color: var(--text-muted);
+  color: var(--text-dim);
   background: transparent;
   transition: all 0.18s;
   text-align: left;
 }
-.article-pill.active { background: var(--text); color: #f5f2eb; border-color: var(--text); }
-.article-pill:not(.active):hover { border-color: rgba(0,0,0,0.25); color: var(--text); }
+.article-pill.active { background: #0a0a0a; color: #ffffff; border-color: #0a0a0a; }
+.article-pill:not(.active):hover { border-color: rgba(0,0,0,0.25); color: var(--text-muted); }
 
 /* ── Code Terminal ───────────────────────────────────────── */
 .terminal {
-  background: #0d0d0d;
+  background: #050505;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.05);
@@ -347,8 +346,8 @@ body {
 
 /* ── Hash Chain Demo ─────────────────────────────────────── */
 .chain-block {
-  background: #ffffff;
-  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.1);
   border-radius: 12px;
   padding: 20px;
   min-width: 168px;
@@ -385,10 +384,10 @@ body {
 }
 .chain-block.tampered { animation: chainFlash 0.55s ease 2; }
 
-/* ── White card (on cream) ───────────────────────────────── */
+/* ── Surface card ────────────────────────────────────────── */
 .card-white {
-  background: #ffffff;
-  border: 1px solid rgba(0,0,0,0.07);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.08);
   border-radius: 16px;
 }
 
@@ -416,4 +415,90 @@ body {
   height: 100%;
   background: var(--text);
   animation: progressFill 2.7s linear forwards;
+}
+
+/* ── Hero headline ───────────────────────────────────────── */
+.hero-gradient-text {
+  color: #0a0a0a;
+}
+
+/* ── Spline: Hero scene ──────────────────────────────────── */
+.hero-spline-container {
+  position: relative;
+  width: 100%;
+  height: 460px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.hero-spline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+@media (max-width: 768px) { .hero-spline { display: none; } }
+
+/* ── Verification Feed (replaces Spline keyboard) ────────── */
+.verify-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 52px;
+}
+@media (max-width: 768px) { .verify-feed-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .verify-feed-grid { grid-template-columns: 1fr; } }
+.verify-card {
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 14px;
+  padding: 22px;
+  transition: all 0.4s cubic-bezier(0.23,1,0.32,1);
+  opacity: 0.45;
+  transform: translateY(4px);
+  cursor: default;
+}
+.verify-card.active {
+  background: rgba(0,0,0,0.07);
+  border-color: rgba(0,0,0,0.18);
+  opacity: 1;
+  transform: translateY(0);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+}
+.verify-card:hover {
+  opacity: 0.85;
+  transform: translateY(-2px);
+}
+.verify-bar-bg {
+  height: 2px;
+  background: rgba(0,0,0,0.1);
+  border-radius: 1px;
+  margin: 14px 0;
+  overflow: hidden;
+}
+.verify-bar-fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.8s ease;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.3 } 50% { opacity: 0.7 } }
+
+/* ── Spline: Watermark + UI overlay suppression ─────────── */
+canvas ~ div,
+canvas + div,
+.spline-watermark,
+a[href*="spline"] {
+  display: none !important;
+}
+
+[class*="spline-watermark"], [id*="spline-watermark"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── Spline: Hero — no pointer events ───────────────────── */
+.hero-spline-container,
+.hero-spline-container * {
+  pointer-events: none !important;
 }
