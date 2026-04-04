@@ -44,12 +44,13 @@ export function SplineScene({ scene, className, style }: SplineSceneProps) {
   }, [scene]);
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
       <Spline
         scene={scene}
         className={className}
-        style={{ width: "100%", height: "100%", ...style }}
+        style={{ width: "100%", height: "100%", display: "block", ...style }}
       />
+      <div style={{ position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none" }} />
     </div>
   );
 }

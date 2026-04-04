@@ -162,13 +162,13 @@ function Hero() {
   return (
     <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "transparent", position: "relative", overflow: "hidden" }}>
       {/* Spline Scene — right half only, fills 50% of hero */}
-      <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "52%", zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
-        <SplineScene scene="https://prod.spline.design/lYYHbwSeuAZemnWu/scene.splinecode" />
+      <div style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", overflow: "hidden", zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
+        <SplineScene scene="https://prod.spline.design/lYYHbwSeuAZemnWu/scene.splinecode" style={{ width: "100%", height: "100%", display: "block" }} />
       </div>
       {/* Gradient mask — solid silver on left, fades into the Spline at center */}
       <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(227,227,227,1) 0%, rgba(227,227,227,1) 40%, rgba(227,227,227,0.6) 50%, transparent 60%)", pointerEvents: "none" }} />
       {/* Hero content */}
-      <div style={{ ...W(), position: "relative", zIndex: 2 }}>
+      <div style={{ ...W(), maxWidth: "50%", position: "relative", zIndex: 20 }}>
         <div style={{ maxWidth: 560 }}>
           <SLabel>AI Verification Infrastructure</SLabel>
           <h1 style={{ ...HERO_H, fontSize: "clamp(56px, 7vw, 88px)", marginBottom: 28, overflow: "visible" }}>

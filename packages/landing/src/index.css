@@ -485,10 +485,7 @@ body {
 
 /* ── Spline: Watermark suppression only ─────────────────── */
 .spline-watermark,
-[class*="spline-watermark"],
-[id*="spline-watermark"],
+[class*="watermark"],
 a[href*="spline.design"] {
   display: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
 }
