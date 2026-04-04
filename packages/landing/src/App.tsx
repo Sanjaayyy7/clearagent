@@ -161,12 +161,12 @@ function Nav() {
 function Hero() {
   return (
     <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "transparent", position: "relative", overflow: "hidden" }}>
-      {/* Spline Scene — full bleed, silver bg matches page bg, monochrome */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", filter: "grayscale(1)", transform: "scale(1.35)", transformOrigin: "center right" }}>
+      {/* Spline Scene — right half only, fills 50% of hero */}
+      <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "52%", zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
         <SplineScene scene="https://prod.spline.design/lYYHbwSeuAZemnWu/scene.splinecode" />
       </div>
-      {/* Subtle left veil so text sits cleanly on silver */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(227,227,227,0.85) 0%, rgba(227,227,227,0.55) 45%, transparent 70%)", pointerEvents: "none" }} />
+      {/* Gradient mask — solid silver on left, fades into the Spline at center */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(227,227,227,1) 0%, rgba(227,227,227,1) 40%, rgba(227,227,227,0.6) 50%, transparent 60%)", pointerEvents: "none" }} />
       {/* Hero content */}
       <div style={{ ...W(), position: "relative", zIndex: 2 }}>
         <div style={{ maxWidth: 560 }}>
