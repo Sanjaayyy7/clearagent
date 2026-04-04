@@ -483,22 +483,12 @@ body {
 }
 @keyframes pulse { 0%, 100% { opacity: 0.3 } 50% { opacity: 0.7 } }
 
-/* ── Spline: Watermark + UI overlay suppression ─────────── */
-canvas ~ div,
-canvas + div,
+/* ── Spline: Watermark suppression only ─────────────────── */
 .spline-watermark,
-a[href*="spline"] {
-  display: none !important;
-}
-
-[class*="spline-watermark"], [id*="spline-watermark"] {
+[class*="spline-watermark"],
+[id*="spline-watermark"],
+a[href*="spline.design"] {
   display: none !important;
   opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-/* ── Spline: Hero — no pointer events ───────────────────── */
-.hero-spline-container,
-.hero-spline-container * {
   pointer-events: none !important;
 }

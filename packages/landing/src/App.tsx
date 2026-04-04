@@ -162,8 +162,10 @@ function Hero() {
   return (
     <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "transparent", position: "relative", overflow: "hidden" }}>
       {/* Spline Scene — full bleed, silver bg matches page bg, monochrome */}
-      <div className="hero-spline-container" style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
         <SplineScene scene="https://prod.spline.design/d-QmlC-bFVNAgTfF/scene.splinecode" />
+        {/* Blocking div — sits above Spline UI layer, hides all overlay buttons */}
+        <div style={{ position: "absolute", inset: 0, zIndex: 10, background: "transparent", pointerEvents: "none" }} />
       </div>
       {/* Subtle left veil so text sits cleanly on silver */}
       <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(227,227,227,0.85) 0%, rgba(227,227,227,0.55) 45%, transparent 70%)", pointerEvents: "none" }} />
