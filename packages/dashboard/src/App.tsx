@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import LiveFeed from "./pages/LiveFeed.tsx";
+import EventDetail from "./pages/EventDetail.tsx";
+import IntegrityReport from "./pages/IntegrityReport.tsx";
+import AgentManagement from "./pages/AgentManagement.tsx";
 
 function Sidebar() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -22,6 +25,9 @@ function Sidebar() {
         <NavLink to="/integrity" className={linkClass}>
           Integrity Report
         </NavLink>
+        <NavLink to="/agents" className={linkClass}>
+          Agent Management
+        </NavLink>
       </nav>
       <div className="mt-auto pt-4 border-t border-brand-border px-2">
         <p className="text-xs text-brand-muted">EU AI Act Compliant</p>
@@ -39,14 +45,9 @@ function App() {
         <main className="flex-1 overflow-auto p-6">
           <Routes>
             <Route path="/" element={<LiveFeed />} />
-            <Route
-              path="/integrity"
-              element={
-                <div className="text-brand-muted text-center mt-20">
-                  Integrity Report — coming in Week 3
-                </div>
-              }
-            />
+            <Route path="/events/:id" element={<EventDetail />} />
+            <Route path="/integrity" element={<IntegrityReport />} />
+            <Route path="/agents" element={<AgentManagement />} />
           </Routes>
         </main>
       </div>

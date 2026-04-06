@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { listEvents, subscribeToEventStream, type VerificationEvent, type EventsResponse } from "../lib/api.ts";
 
 function StatusBadge({ status, decision }: { status: string; decision: string }) {
@@ -29,6 +30,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 }
 
 export default function LiveFeed() {
+  const navigate = useNavigate();
   const [events, setEvents] = useState<VerificationEvent[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -103,7 +105,11 @@ export default function LiveFeed() {
           </thead>
           <tbody>
             {events.map((event) => (
-              <tr key={event.id} className="border-b border-brand-border/50 hover:bg-brand-border/20 transition-colors">
+              <tr
+                key={event.id}
+                className="border-b border-brand-border/50 hover:bg-brand-border/20 transition-colors cursor-pointer"
+                onClick={() => navigate(`/events/${event.id}`)}
+              >
                 <td className="p-3 pl-4">
                   <StatusBadge status={event.status} decision={event.decision} />
                 </td>

@@ -21,6 +21,16 @@ const updateStatusSchema = z.object({
   status: z.enum(["active", "suspended", "flagged"]),
 });
 
+// GET /v1/agents — list all registered agents
+router.get("/", async (_req, res, next) => {
+  try {
+    const agents = await db.select().from(schema.agents).orderBy(schema.agents.registeredAt);
+    res.json({ agents });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /v1/agents/register — register a new AI agent under compliance oversight
 router.post("/register", validate(registerSchema), async (req, res, next) => {
   try {

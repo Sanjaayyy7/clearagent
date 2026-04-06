@@ -131,7 +131,7 @@ function Nav() {
           ))}
         </div>
         <div className="hidden md:flex" style={{ gap: 10, alignItems: "center" }}>
-          <a href="https://github.com/clearagent"
+          <a href="https://github.com/Sanjaayyy7/clearagent"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 18px", borderRadius: 9999, border: "1px solid rgba(0,0,0,0.18)", color: "#333333", fontSize: 14, fontFamily: "var(--font-sans)", textDecoration: "none", transition: "border-color 0.15s, color 0.15s" }}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
             GitHub
@@ -148,7 +148,7 @@ function Nav() {
         <div style={{ borderTop: "1px solid rgba(0,0,0,0.08)", background: "rgba(255,255,255,0.96)", padding: "16px 48px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
           {links.map((l) => <a key={l} href={`#${l.toLowerCase()}`} onClick={() => setOpen(false)} style={{ ...FS, fontSize: 15, color: "#555555", textDecoration: "none" }}>{l}</a>)}
           <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
-            <a href="https://github.com/clearagent" style={{ flex: 1, justifyContent: "center", display: "inline-flex", alignItems: "center", padding: "9px 18px", borderRadius: 9999, border: "1px solid rgba(0,0,0,0.18)", color: "#333333", fontSize: 14, fontFamily: "var(--font-sans)", textDecoration: "none" }}>GitHub</a>
+            <a href="https://github.com/Sanjaayyy7/clearagent" style={{ flex: 1, justifyContent: "center", display: "inline-flex", alignItems: "center", padding: "9px 18px", borderRadius: 9999, border: "1px solid rgba(0,0,0,0.18)", color: "#333333", fontSize: 14, fontFamily: "var(--font-sans)", textDecoration: "none" }}>GitHub</a>
             <a href="#developer" className="btn-black btn-sm" style={{ flex: 1, justifyContent: "center" }} onClick={() => setOpen(false)}>Get API Key</a>
           </div>
         </div>
@@ -160,19 +160,16 @@ function Nav() {
 /* ── Hero ────────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "transparent", position: "relative", overflow: "hidden" }}>
+    <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "#ffffff", position: "relative", overflow: "hidden" }}>
       {/* Spline Scene — right half only, fills 50% of hero */}
-      <div style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", overflow: "hidden", zIndex: 0, pointerEvents: "none", filter: "grayscale(1)" }}>
-        <SplineScene scene="https://prod.spline.design/lYYHbwSeuAZemnWu/scene.splinecode" style={{ width: "100%", height: "100%", display: "block" }} />
+      <div style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", overflow: "hidden", zIndex: 0, pointerEvents: "none", background: "#ffffff" }}>
+        <SplineScene scene="https://prod.spline.design/lYYHbwSeuAZemnWu/scene.splinecode" style={{ width: "100%", height: "100%", display: "block", transform: "translate(-25%, -6%) scale(3.45)", transformOrigin: "50% 50%", filter: "grayscale(1) contrast(1.24) brightness(1.08) saturate(0) drop-shadow(0 18px 28px rgba(255,255,255,0.18)) drop-shadow(0 10px 20px rgba(0,0,0,0.08))" }} />
       </div>
-      {/* Gradient mask — solid silver on left, fades into the Spline at center */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(227,227,227,1) 0%, rgba(227,227,227,1) 40%, rgba(227,227,227,0.6) 50%, transparent 60%)", pointerEvents: "none" }} />
       {/* Hero content */}
-      <div style={{ ...W(), maxWidth: "50%", position: "relative", zIndex: 20 }}>
-        <div style={{ maxWidth: 560 }}>
-          <SLabel>AI Verification Infrastructure</SLabel>
+      <div style={{ ...W(), position: "relative", zIndex: 20 }}>
+        <div style={{ maxWidth: "50%", width: "100%" }}>
           <h1 style={{ ...HERO_H, fontSize: "clamp(56px, 7vw, 88px)", marginBottom: 28, overflow: "visible" }}>
-            <span className="hero-gradient-text" style={{ display: "block" }}>Verification</span>
+            <span className="hero-gradient-text" style={{ display: "block" }}>AI Verification</span>
             <span className="hero-gradient-text" style={{ display: "block" }}>infrastructure.</span>
           </h1>
           <p style={{ ...BODY, maxWidth: 420, marginBottom: 36 }}>
@@ -181,7 +178,7 @@ function Hero() {
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 44 }}>
             <a href="#developer" className="btn-black">Get started free <span className="arrow">→</span></a>
-            <a href="https://github.com/clearagent" className="btn-outline">Read the docs</a>
+            <a href="https://github.com/Sanjaayyy7/clearagent" className="btn-outline">Read the docs</a>
           </div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888888", letterSpacing: "0.02em" }}>
             80 events verified &nbsp;&nbsp;·&nbsp;&nbsp; 100% chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; 10 human reviews
@@ -774,9 +771,9 @@ function Developer() {
         <div className={`reveal${visible ? " in" : ""} reveal-delay-2`} style={{ marginTop: 28, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
           <p style={{ ...FS, fontSize: 14, color: "#888888", letterSpacing: "-0.01em" }}>Available in TypeScript, Python, and REST. MIT licensed.</p>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <a href="https://github.com/clearagent" className="btn-black btn-sm">View full docs</a>
+            <a href="https://github.com/Sanjaayyy7/clearagent" className="btn-black btn-sm">View full docs</a>
             <span style={{ color: "#333333", userSelect: "none" }}>|</span>
-            <a href="https://github.com/clearagent" style={{ ...FS, fontSize: 14, color: "#888888", textDecoration: "none", letterSpacing: "-0.01em" }}
+            <a href="https://github.com/Sanjaayyy7/clearagent" style={{ ...FS, fontSize: 14, color: "#888888", textDecoration: "none", letterSpacing: "-0.01em" }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#0a0a0a")}
               onMouseLeave={(e) => (e.currentTarget.style.color = "#888888")}>View on GitHub</a>
           </div>
@@ -798,10 +795,16 @@ function Footer() {
           <span style={{ ...FS, fontSize: 13, color: "#666666", fontWeight: 500 }}>© 2026 ClearAgent, Inc.</span>
         </div>
         <div style={{ display: "flex", gap: 24 }}>
-          {["Privacy", "Terms", "GitHub", "Status"].map((l) => (
-            <a key={l} href="#" style={{ ...FS, fontSize: 13, color: "#666666", textDecoration: "none", transition: "color 0.15s" }}
+          {([
+            { label: "Privacy",  href: "https://github.com/Sanjaayyy7/clearagent" },
+            { label: "Terms",    href: "https://github.com/Sanjaayyy7/clearagent" },
+            { label: "GitHub",   href: "https://github.com/Sanjaayyy7/clearagent" },
+            { label: "Status",   href: "https://github.com/Sanjaayyy7/clearagent" },
+          ] as const).map(({ label, href }) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+              style={{ ...FS, fontSize: 13, color: "#666666", textDecoration: "none", transition: "color 0.15s" }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#aaaaaa")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#666666")}>{l}</a>
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#666666")}>{label}</a>
           ))}
         </div>
       </div>

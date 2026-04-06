@@ -29,7 +29,13 @@ app.set("verificationQueue", verificationQueue);
 
 // ─── Middleware ───────────────────────────────────────────────
 app.use(helmet());
-app.use(cors());
+const _corsOrigins = process.env.CORS_ORIGINS;
+app.use(cors({
+  origin: _corsOrigins === "*" || !_corsOrigins
+    ? "*"
+    : _corsOrigins.split(",").map((o) => o.trim()),
+  credentials: false,
+}));
 app.use(express.json());
 
 // Request ID tracking

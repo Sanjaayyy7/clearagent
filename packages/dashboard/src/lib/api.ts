@@ -35,6 +35,47 @@ export interface VerificationEvent {
   occurredAt: string;
   recordedAt: string;
   euAiActArticles: string[];
+  agentId: string | null;
+}
+
+export interface HumanReview {
+  id: string;
+  eventId: string;
+  action: "approve" | "reject" | "override";
+  justification: string;
+  reviewerId: string;
+  reviewerEmail: string;
+  reviewerRole: string;
+  overrideDecision: string | null;
+  contentHash: string;
+  reviewedAt: string;
+}
+
+export interface AuditIntegrity {
+  validChain: boolean;
+  totalEvents: number;
+  merkleRoot: string | null;
+  checkedAt: string;
+  brokenAt: string | null;
+}
+
+export interface AuditExport {
+  exportId: string;
+  fileHash: string;
+  events: VerificationEvent[];
+  reviews: HumanReview[];
+  generatedAt: string;
+}
+
+export interface Agent {
+  id: string;
+  name: string;
+  externalId: string;
+  status: "active" | "suspended" | "flagged";
+  modelProvider: string | null;
+  modelId: string | null;
+  description: string | null;
+  registeredAt: string;
 }
 
 export interface EventsResponse {
@@ -54,8 +95,65 @@ export async function listEvents(params?: { limit?: number; status?: string }): 
   return apiFetch(`/v1/events?${query}`);
 }
 
-export async function getEvent(id: string): Promise<VerificationEvent & { humanReviews: unknown[] }> {
+export async function getEvent(id: string): Promise<VerificationEvent & { humanReviews: HumanReview[] }> {
   return apiFetch(`/v1/events/${id}`);
+}
+
+export async function submitReview(data: {
+  eventId: string;
+  action: "approve" | "reject" | "override";
+  justification: string;
+  reviewerId: string;
+  reviewerEmail: string;
+  reviewerRole: string;
+  overrideDecision?: string;
+}): Promise<HumanReview> {
+  return apiFetch("/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getAuditIntegrity(): Promise<AuditIntegrity> {
+  return apiFetch("/v1/audit/integrity");
+}
+
+export async function getAuditExport(params?: {
+  authorityName?: string;
+  authorityRef?: string;
+}): Promise<AuditExport> {
+  const query = new URLSearchParams();
+  if (params?.authorityName) query.set("authorityName", params.authorityName);
+  if (params?.authorityRef) query.set("authorityRef", params.authorityRef);
+  const qs = query.toString();
+  return apiFetch(`/v1/audit/export${qs ? `?${qs}` : ""}`);
+}
+
+export async function getAgents(): Promise<{ agents: Agent[] }> {
+  return apiFetch("/v1/agents");
+}
+
+export async function registerAgent(data: {
+  name: string;
+  externalId: string;
+  modelProvider?: string;
+  modelId?: string;
+  description?: string;
+}): Promise<{ agentId: string; apiKey: string; status: string; registeredAt: string }> {
+  return apiFetch("/v1/agents/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateAgentStatus(
+  agentId: string,
+  status: "active" | "suspended" | "flagged"
+): Promise<{ agentId: string; status: string; name: string }> {
+  return apiFetch(`/v1/agents/${agentId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 /**

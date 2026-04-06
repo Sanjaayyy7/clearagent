@@ -36,6 +36,7 @@ const verifySchema = z.object({
       })
       .optional(),
   }),
+  agentId: z.string().uuid().optional(),
   sessionId: z.string().uuid().optional(),
   parentEventId: z.string().uuid().optional(),
   sequenceNum: z.number().int().nonnegative().default(0),
@@ -47,11 +48,10 @@ router.post("/verify", validate(verifySchema), async (req, res, next) => {
     const body = req.body;
     const auth = (req as any).auth;
 
-    // Get demo org/agent from DB (oldest agent = original demo agent)
+    // Get demo org from DB
     const org = await db.select().from(schema.organizations).orderBy(schema.organizations.createdAt).limit(1);
-    const agent = await db.select().from(schema.agents).orderBy(schema.agents.registeredAt).limit(1);
 
-    if (org.length === 0 || agent.length === 0) {
+    if (org.length === 0) {
       res.status(500).json({
         error: { code: "not_seeded", message: "Database not seeded. Run: npm run seed" },
       });
@@ -59,15 +59,39 @@ router.post("/verify", validate(verifySchema), async (req, res, next) => {
     }
 
     const orgId = org[0].id;
-    const agentId = agent[0].id;
     const retentionDays = org[0].dataRetentionDays;
 
-    // Check agent is not suspended (Art. 14 stop button)
-    if (agent[0].status === "suspended") {
-      res.status(403).json({
-        error: { code: "agent_suspended", message: "Agent is suspended and cannot submit verification events" },
-      });
-      return;
+    // Resolve agent: use specific agentId from body if provided, else fallback to oldest demo agent
+    let agentId: string;
+    if (body.agentId) {
+      const specificAgent = await db.select().from(schema.agents).where(eq(schema.agents.id, body.agentId)).limit(1);
+      if (specificAgent.length === 0) {
+        res.status(404).json({ error: { code: "not_found", message: `Agent ${body.agentId} not found` } });
+        return;
+      }
+      if (specificAgent[0].status === "suspended") {
+        res.status(403).json({
+          error: { code: "agent_suspended", message: "Agent is suspended and cannot submit verification events" },
+        });
+        return;
+      }
+      agentId = specificAgent[0].id;
+    } else {
+      const defaultAgent = await db.select().from(schema.agents).orderBy(schema.agents.registeredAt).limit(1);
+      if (defaultAgent.length === 0) {
+        res.status(500).json({
+          error: { code: "not_seeded", message: "Database not seeded. Run: npm run seed" },
+        });
+        return;
+      }
+      // Check agent is not suspended (Art. 14 stop button)
+      if (defaultAgent[0].status === "suspended") {
+        res.status(403).json({
+          error: { code: "agent_suspended", message: "Agent is suspended and cannot submit verification events" },
+        });
+        return;
+      }
+      agentId = defaultAgent[0].id;
     }
 
     // Create job record

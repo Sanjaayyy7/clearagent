@@ -1,0 +1,10 @@
+node_modules
+.git
+dist
+*.log
+.env
+.env.local
+packages/dashboard/dist
+packages/landing/dist
+packages/sdk/dist
+packages/mcp-server/dist

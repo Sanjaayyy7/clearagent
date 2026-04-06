@@ -9,30 +9,33 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "seed": "tsx seed.ts"
+    "seed": "tsx seed.ts",
+    "test": "vitest run"
   },
   "dependencies": {
-    "express": "^4.21.0",
-    "drizzle-orm": "^0.36.0",
-    "postgres": "^3.4.0",
-    "zod": "^3.23.0",
+    "bcrypt": "^5.1.0",
     "bullmq": "^5.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.36.0",
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
     "ioredis": "^5.4.0",
     "nanoid": "^5.0.0",
-    "bcrypt": "^5.1.0",
-    "helmet": "^8.0.0",
-    "cors": "^2.8.5",
     "pino": "^9.0.0",
     "pino-pretty": "^11.0.0",
-    "dotenv": "^16.4.0"
+    "postgres": "^3.4.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/bcrypt": "^5.0.0",
     "@types/cors": "^2.8.0",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "drizzle-kit": "^0.28.0",
     "tsx": "^4.19.0",
-    "drizzle-kit": "^0.28.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.2"
   }
 }
