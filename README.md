@@ -108,6 +108,62 @@ Enforcement deadline: **August 2026**. See [docs/eu-ai-act-guide.md](docs/eu-ai-
 
 Full request/response schemas and curl examples: [docs/api-reference.md](docs/api-reference.md)
 
+## SDK
+
+```typescript
+import ClearAgentClient from "@clearagent/sdk";
+
+const ca = new ClearAgentClient({
+  apiKey: "ca_live_...",
+  baseUrl: "https://your-clearagent-instance.com",
+});
+
+// Submit a verification event
+const { jobId } = await ca.events.verify({
+  input: { amount: 1500, currency: "USD", recipient: "Acme Corp", purpose: "License renewal" },
+});
+
+// Poll until complete
+const result = await ca.jobs.poll(jobId);
+console.log(result.contentHash);   // SHA-256 hash of this event
+console.log(result.requiresReview); // true if human review needed (Art. 14)
+
+// Check audit integrity
+const integrity = await ca.audit.integrity();
+console.log(integrity.validChain); // true if hash chain is intact
+console.log(integrity.merkleRoot); // Merkle root over all events
+```
+
+See [`examples/quickstart.ts`](examples/quickstart.ts) for a complete walkthrough.
+
+## MCP Server
+
+Connect ClearAgent to any Claude-compatible agent or MCP client:
+
+```json
+{
+  "mcpServers": {
+    "clearagent": {
+      "command": "node",
+      "args": ["./packages/mcp-server/dist/index.js"],
+      "env": {
+        "CLEARAGENT_API_KEY": "ca_test_demo_key_clearagent_2026",
+        "CLEARAGENT_API_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
+```
+
+Available tools:
+
+| Tool | Description |
+|------|-------------|
+| `clearagent_verify` | Submit a decision for verification, get a `jobId` |
+| `clearagent_poll` | Retrieve the verification result and `contentHash` |
+| `clearagent_audit_integrity` | Verify hash chain integrity and get Merkle root |
+| `clearagent_submit_review` | Submit human review for flagged decisions (Art. 14) |
+
 ## Stack
 
 | Layer | Technology |
@@ -116,11 +172,14 @@ Full request/response schemas and curl examples: [docs/api-reference.md](docs/ap
 | Queue | BullMQ · Redis 7 |
 | Database | PostgreSQL 16 · Drizzle ORM |
 | Dashboard | React 18 · Vite · Tailwind |
-| Protocol | MCP server (planned) |
+| SDK | TypeScript · fetch |
+| Protocol | MCP server · stdio transport |
 | Infra | Docker Compose |
 
 ## Roadmap
 
+- [x] TypeScript SDK (`ClearAgentClient`)
+- [x] MCP server (4 tools)
 - [ ] Identity verification domain
 - [ ] Authorization verification domain
 - [ ] Webhook delivery with HMAC signing
@@ -130,7 +189,6 @@ Full request/response schemas and curl examples: [docs/api-reference.md](docs/ap
 - [ ] RFC 3161 timestamp anchoring
 - [ ] Dockerfile + production deployment guide
 - [ ] `npm` package: `@clearagent/sdk`
-- [ ] MCP server implementation
 
 ## Contributing
 

@@ -112,3 +112,67 @@ Human review (`POST /v1/reviews`) is then required. The `justification` field is
 - **Art. 19** — Record keeping: audit export with file hash
 - **Enforcement deadline:** August 2026
 - **Penalty:** Up to 4% of global annual revenue
+
+## SDK Usage
+
+```typescript
+import ClearAgentClient from "@clearagent/sdk";
+// or during development:
+import ClearAgentClient from "./packages/sdk/src/index.js";
+
+const ca = new ClearAgentClient({ apiKey: "ca_live_..." });
+
+// Submit + poll (full lifecycle)
+const { jobId } = await ca.events.verify({ input: { amount, currency, recipient, purpose } });
+const result = await ca.jobs.poll(jobId); // { eventId, contentHash, requiresReview }
+
+// If review required (Art. 14)
+await ca.reviews.submit({ eventId: result.eventId, action: "approve", justification: "...",
+  reviewerId: "...", reviewerEmail: "...", reviewerRole: "compliance_officer" });
+
+// Audit
+const integrity = await ca.audit.integrity(); // { validChain, merkleRoot, totalEvents }
+const exported  = await ca.audit.export({ authorityName: "BaFin", authorityRef: "INQ-2026-01" });
+
+// Agents
+const agent = await ca.agents.register({ name, externalId, modelProvider?, modelId? });
+await ca.agents.suspend(agentId); // Art. 14 stop button
+```
+
+## MCP Server
+
+Config (`~/.claude/claude_desktop_config.json` or `mcp.json`):
+```json
+{
+  "mcpServers": {
+    "clearagent": {
+      "command": "node",
+      "args": ["./packages/mcp-server/dist/index.js"],
+      "env": {
+        "CLEARAGENT_API_KEY": "ca_test_demo_key_clearagent_2026",
+        "CLEARAGENT_API_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
+```
+
+Tools: `clearagent_verify`, `clearagent_poll`, `clearagent_audit_integrity`, `clearagent_submit_review`  
+Build: `npm run build --workspace=packages/mcp-server`
+
+## ECC Setup
+
+ECC (Everything Claude Code) installed: April 2026  
+56 agents · 193 skills · 82 commands
+
+Key commands for ClearAgent development:
+- `/plan` — task decomposition before any build
+- `/tdd` — test-driven development enforcement
+- `/security-scan` — AgentShield scan before commits
+- `/code-review` — automated PR review
+- `/skill-create` — generate skills from git history
+- `/feature-dev` — full feature development workflow
+- `/checkpoint` — save session state
+
+Always run `/plan` before starting any new feature.  
+Always run `/security-scan` before committing.
