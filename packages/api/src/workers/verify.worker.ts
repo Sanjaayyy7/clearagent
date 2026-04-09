@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { Redis as IORedis } from "ioredis";
 import { db, schema } from "../db/index.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { verifyTransaction, type TransactionInput } from "../verification/transaction.js";
 import { computeContentHash, computeInputHash } from "../services/hashChain.js";
 import { evaluateOversightPolicies } from "../services/oversight.js";
@@ -22,17 +22,6 @@ export interface VerificationJobData {
   retentionDays: number;
 }
 
-async function getLastHash(orgId: string): Promise<string | null> {
-  const events = await db
-    .select({ contentHash: schema.verificationEvents.contentHash })
-    .from(schema.verificationEvents)
-    .where(eq(schema.verificationEvents.orgId, orgId))
-    .orderBy(desc(schema.verificationEvents.recordedAt))
-    .limit(1);
-
-  return events.length > 0 ? events[0].contentHash : null;
-}
-
 async function processVerification(job: Job<VerificationJobData>): Promise<void> {
   const data = job.data;
   const log = logger.child({ jobId: data.jobId, bullJobId: job.id });
@@ -42,19 +31,11 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
   await db.update(schema.jobs).set({ status: "processing", updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));
 
   try {
-    // Run verification
+    // Run verification outside the transaction — pure computation + external I/O
     const result = await verifyTransaction(data.inputPayload as unknown as TransactionInput);
 
-    // Compute hashes
     const occurredAt = new Date();
     const inputHash = computeInputHash(data.inputPayload);
-    const prevHash = await getLastHash(data.orgId);
-    const contentHash = computeContentHash({
-      inputHash,
-      outputPayload: result,
-      decision: result.decision,
-      occurredAt: occurredAt.toISOString(),
-    });
 
     // Evaluate oversight policies
     const oversight = evaluateOversightPolicies({
@@ -68,33 +49,55 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
     const retentionExpiresAt = new Date();
     retentionExpiresAt.setDate(retentionExpiresAt.getDate() + data.retentionDays);
 
+    // Atomic: advisory lock → read prevHash → insert event
+    // pg_advisory_xact_lock serializes concurrent workers for the same org, preventing forked hash chains
     // EU-AI-ACT-GAP: Art. 12 — reasoning field is free text; no structured schema for machine-readable audit
-    // Single INSERT with complete data — genuine append-only (EU AI Act Art. 12)
-    const [event] = await db
-      .insert(schema.verificationEvents)
-      .values({
-        orgId: data.orgId,
-        agentId: data.agentId,
-        eventType: data.eventType,
-        eventCategory: data.eventCategory,
+    const event = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.orgId}))`);
+
+      const prevRows = await tx
+        .select({ contentHash: schema.verificationEvents.contentHash })
+        .from(schema.verificationEvents)
+        .where(eq(schema.verificationEvents.orgId, data.orgId))
+        .orderBy(desc(schema.verificationEvents.recordedAt))
+        .limit(1);
+      const prevHash = prevRows[0]?.contentHash ?? null;
+
+      const contentHash = computeContentHash({
         inputHash,
-        inputPayload: data.inputPayload,
         outputPayload: result,
         decision: result.decision,
-        confidence: result.confidence.toString(),
-        reasoning: result.reasoning,
-        sessionId: data.sessionId,
-        parentEventId: data.parentEventId,
-        sequenceNum: data.sequenceNum,
-        euAiActArticles: ["12", "14", "19"],
-        contentHash,
-        prevHash,
-        occurredAt,
-        retentionExpiresAt,
-        status: finalStatus,
-        requiresReview: oversight.requiresReview,
-      })
-      .returning();
+        occurredAt: occurredAt.toISOString(),
+      });
+
+      const [inserted] = await tx
+        .insert(schema.verificationEvents)
+        .values({
+          orgId: data.orgId,
+          agentId: data.agentId,
+          eventType: data.eventType,
+          eventCategory: data.eventCategory,
+          inputHash,
+          inputPayload: data.inputPayload,
+          outputPayload: result,
+          decision: result.decision,
+          confidence: result.confidence.toString(),
+          reasoning: result.reasoning,
+          sessionId: data.sessionId,
+          parentEventId: data.parentEventId,
+          sequenceNum: data.sequenceNum,
+          euAiActArticles: ["12", "14", "19"],
+          contentHash,
+          prevHash,
+          occurredAt,
+          retentionExpiresAt,
+          status: finalStatus,
+          requiresReview: oversight.requiresReview,
+        })
+        .returning();
+
+      return inserted;
+    });
 
     // Mark job completed
     await db.update(schema.jobs).set({ status: "completed", eventId: event.id, updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));

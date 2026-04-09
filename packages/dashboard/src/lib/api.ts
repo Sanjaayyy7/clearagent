@@ -1,12 +1,16 @@
 const API_URL = import.meta.env.VITE_API_URL || "";
-const API_KEY = import.meta.env.VITE_API_KEY || "ca_test_demo_key_clearagent_2026";
+const API_KEY = import.meta.env.VITE_API_KEY;
+if (!API_KEY && import.meta.env.PROD) {
+  throw new Error("VITE_API_KEY must be set in production.");
+}
+const EFFECTIVE_KEY = API_KEY ?? "ca_test_demo_key_clearagent_2026";
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${EFFECTIVE_KEY}`,
       ...options?.headers,
     },
   });
@@ -40,15 +44,19 @@ export interface VerificationEvent {
 
 export interface HumanReview {
   id: string;
+  orgId: string;
   eventId: string;
   action: "approve" | "reject" | "override";
+  originalDecision: string;
   justification: string;
   reviewerId: string;
   reviewerEmail: string;
   reviewerRole: string;
   overrideDecision: string | null;
+  reviewRequestedAt: string;
+  reviewCompletedAt: string;
+  reviewSlaMs?: number | null;
   contentHash: string;
-  reviewedAt: string;
 }
 
 export interface AuditIntegrity {
@@ -61,10 +69,20 @@ export interface AuditIntegrity {
 
 export interface AuditExport {
   exportId: string;
+  generatedAt: string;
   fileHash: string;
+  recordCount: number;
+  filters: {
+    agent_id?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    authority_name?: string;
+    authority_ref?: string;
+    format: string;
+  };
   events: VerificationEvent[];
   reviews: HumanReview[];
-  generatedAt: string;
 }
 
 export interface Agent {
@@ -123,8 +141,8 @@ export async function getAuditExport(params?: {
   authorityRef?: string;
 }): Promise<AuditExport> {
   const query = new URLSearchParams();
-  if (params?.authorityName) query.set("authorityName", params.authorityName);
-  if (params?.authorityRef) query.set("authorityRef", params.authorityRef);
+  if (params?.authorityName) query.set("authority_name", params.authorityName);
+  if (params?.authorityRef) query.set("authority_ref", params.authorityRef);
   const qs = query.toString();
   return apiFetch(`/v1/audit/export${qs ? `?${qs}` : ""}`);
 }
@@ -165,7 +183,7 @@ export function subscribeToEventStream(
   onError?: (err: Event) => void
 ): () => void {
   // EventSource doesn't support custom headers — pass key as query param for SSE
-  const url = `${API_URL}/v1/events/stream?api_key=${API_KEY}`;
+  const url = `${API_URL}/v1/events/stream?api_key=${EFFECTIVE_KEY}`;
   const source = new EventSource(url);
 
   source.onmessage = (e) => {
