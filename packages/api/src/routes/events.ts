@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Queue } from "bullmq";
 import postgres from "postgres";
 import { db, schema } from "../db/index.js";
-import { eq, desc, and, gte, lte, sql, lt, or } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, lt, or, asc } from "drizzle-orm";
 import { validate } from "../middleware/validate.js";
 import { QUEUE_NAME, type VerificationJobData } from "../workers/verify.worker.js";
 import { logger } from "../logger.js";
@@ -47,23 +47,33 @@ router.post("/verify", validate(verifySchema), async (req, res, next) => {
   try {
     const body = req.body;
     const auth = (req as any).auth;
+    const orgId: string = auth.orgId;
 
-    // Get demo org from DB
-    const org = await db.select().from(schema.organizations).orderBy(schema.organizations.createdAt).limit(1);
-
+    // Fetch org for retention config
+    const org = await db.select().from(schema.organizations).where(eq(schema.organizations.id, orgId)).limit(1);
     if (org.length === 0) {
       res.status(500).json({
-        error: { code: "not_seeded", message: "Database not seeded. Run: npm run seed" },
+        error: { code: "org_not_found", message: "Organization not found for this API key" },
       });
       return;
     }
-
-    const orgId = org[0].id;
     const retentionDays = org[0].dataRetentionDays;
 
-    // Resolve agent: use specific agentId from body if provided, else fallback to oldest demo agent
+    // Resolve agent: explicit body.agentId must match the authenticated key if one is bound.
+    const authenticatedAgentId = auth?.agentId as string | undefined;
+
     let agentId: string;
     if (body.agentId) {
+      if (authenticatedAgentId && body.agentId !== authenticatedAgentId) {
+        res.status(403).json({
+          error: {
+            code: "agent_mismatch",
+            message: "Authenticated API key cannot submit events for a different agent",
+          },
+        });
+        return;
+      }
+
       const specificAgent = await db.select().from(schema.agents).where(eq(schema.agents.id, body.agentId)).limit(1);
       if (specificAgent.length === 0) {
         res.status(404).json({ error: { code: "not_found", message: `Agent ${body.agentId} not found` } });
@@ -76,6 +86,21 @@ router.post("/verify", validate(verifySchema), async (req, res, next) => {
         return;
       }
       agentId = specificAgent[0].id;
+    } else if (authenticatedAgentId) {
+      const boundAgent = await db.select().from(schema.agents).where(eq(schema.agents.id, authenticatedAgentId)).limit(1);
+      if (boundAgent.length === 0) {
+        res.status(401).json({
+          error: { code: "invalid_api_key", message: "Authenticated API key is not linked to a valid agent" },
+        });
+        return;
+      }
+      if (boundAgent[0].status === "suspended") {
+        res.status(403).json({
+          error: { code: "agent_suspended", message: "Agent is suspended and cannot submit verification events" },
+        });
+        return;
+      }
+      agentId = boundAgent[0].id;
     } else {
       const defaultAgent = await db.select().from(schema.agents).orderBy(schema.agents.registeredAt).limit(1);
       if (defaultAgent.length === 0) {
@@ -158,11 +183,12 @@ router.get("/stream", (req, res) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
+    const auth = (req as any).auth;
 
     const events = await db
       .select()
       .from(schema.verificationEvents)
-      .where(eq(schema.verificationEvents.id, id));
+      .where(and(eq(schema.verificationEvents.id, id), eq(schema.verificationEvents.orgId, auth.orgId)));
 
     if (events.length === 0) {
       res.status(404).json({
@@ -177,7 +203,8 @@ router.get("/:id", async (req, res, next) => {
     const reviews = await db
       .select()
       .from(schema.humanReviews)
-      .where(eq(schema.humanReviews.eventId, id));
+      .where(eq(schema.humanReviews.eventId, id))
+      .orderBy(asc(schema.humanReviews.reviewCompletedAt));
 
     res.json({
       ...event,
@@ -191,11 +218,12 @@ router.get("/:id", async (req, res, next) => {
 // GET /v1/events — list events with filters and optional cursor pagination
 router.get("/", async (req, res, next) => {
   try {
+    const auth = (req as any).auth;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
     const { agent_id, status, from, to, cursor } = req.query;
 
-    const conditions = [];
+    const conditions = [eq(schema.verificationEvents.orgId, auth.orgId)];
     if (agent_id) conditions.push(eq(schema.verificationEvents.agentId, agent_id as string));
     if (status) conditions.push(eq(schema.verificationEvents.status, status as string));
     if (from) conditions.push(gte(schema.verificationEvents.occurredAt, new Date(from as string)));

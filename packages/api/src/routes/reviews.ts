@@ -45,9 +45,10 @@ router.post("/", validate(reviewSchema), async (req, res, next) => {
     const event = events[0];
     const now = new Date();
 
-    // Compute content hash for immutability (hash of all review fields)
+    // Compute content hash bound to the event's contentHash (reviewer non-repudiation — Art. 14)
+    // Including event.contentHash proves the reviewer saw and acted on this specific event state
     const contentHash = sha256(
-      [body.eventId, body.action, body.justification, body.reviewerId, body.reviewerEmail, now.toISOString()].join("|")
+      [body.eventId, event.contentHash, body.action, body.justification, body.reviewerId, body.reviewerEmail, now.toISOString()].join("|")
     );
 
     const [review] = await db

@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { Queue } from "bullmq";
 import { Redis as IORedis } from "ioredis";
 import { eventsRouter } from "./routes/events.js";
@@ -29,6 +30,15 @@ app.set("verificationQueue", verificationQueue);
 
 // ─── Middleware ───────────────────────────────────────────────
 app.use(helmet());
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "rate_limit_exceeded", message: "Too many requests, please retry after a minute" } },
+});
+app.use(limiter);
 const _corsOrigins = process.env.CORS_ORIGINS;
 app.use(cors({
   origin: _corsOrigins === "*" || !_corsOrigins

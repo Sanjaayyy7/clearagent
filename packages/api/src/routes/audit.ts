@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, schema } from "../db/index.js";
-import { asc, and, eq, gte, lte } from "drizzle-orm";
+import { asc, desc, and, eq, gte, inArray, lte } from "drizzle-orm";
 import { computeContentHash, computeMerkleRoot, sha256 } from "../services/hashChain.js";
 import { logger } from "../logger.js";
 
@@ -9,7 +9,9 @@ const router = Router();
 // GET /v1/audit/integrity — verify hash chain integrity (EU AI Act Art. 12 + 19)
 router.get("/integrity", async (req, res, next) => {
   try {
-    // Fetch all events in insertion order
+    const auth = (req as any).auth;
+
+    // Fetch all events for this org in insertion order
     const events = await db
       .select({
         id: schema.verificationEvents.id,
@@ -21,10 +23,10 @@ router.get("/integrity", async (req, res, next) => {
         prevHash: schema.verificationEvents.prevHash,
       })
       .from(schema.verificationEvents)
+      .where(eq(schema.verificationEvents.orgId, auth.orgId))
       .orderBy(asc(schema.verificationEvents.recordedAt));
 
     let brokenAt: string | null = null;
-    let chainLength = 0;
 
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
@@ -48,22 +50,20 @@ router.get("/integrity", async (req, res, next) => {
         break;
       }
 
-      chainLength++;
     }
 
-    const status = brokenAt ? "broken" : "intact";
+    const validChain = brokenAt === null;
     const hashes = events.map((e) => e.contentHash);
     const merkleRoot = computeMerkleRoot(hashes);
 
-    logger.info({ status, totalEvents: events.length, brokenAt }, "Integrity check completed");
+    logger.info({ validChain, totalEvents: events.length, brokenAt }, "Integrity check completed");
 
     res.json({
-      status,
+      validChain,
       totalEvents: events.length,
-      chainLength,
       merkleRoot,
       checkedAt: new Date().toISOString(),
-      ...(brokenAt ? { brokenAt } : {}),
+      brokenAt,
     });
   } catch (err) {
     next(err);
@@ -73,15 +73,34 @@ router.get("/integrity", async (req, res, next) => {
 // GET /v1/audit/export — full export with hashes, logged (EU AI Act Art. 19)
 router.get("/export", async (req, res, next) => {
   try {
-    const { agent_id, status, from, to } = req.query;
+    const auth = (req as any).auth;
+    const orgId: string = auth.orgId;
 
-    const conditions = [];
-    if (agent_id) conditions.push(eq(schema.verificationEvents.agentId, agent_id as string));
-    if (status) conditions.push(eq(schema.verificationEvents.status, status as string));
-    if (from) conditions.push(gte(schema.verificationEvents.occurredAt, new Date(from as string)));
-    if (to) conditions.push(lte(schema.verificationEvents.occurredAt, new Date(to as string)));
+    const agentId = typeof req.query.agent_id === "string" ? req.query.agent_id : undefined;
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const from = typeof req.query.from === "string" ? req.query.from : undefined;
+    const to = typeof req.query.to === "string" ? req.query.to : undefined;
+    const authorityName = typeof req.query.authority_name === "string" ? req.query.authority_name : undefined;
+    const authorityRef = typeof req.query.authority_ref === "string" ? req.query.authority_ref : undefined;
+    const format = typeof req.query.format === "string" ? req.query.format : "json";
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    if (format !== "json") {
+      res.status(501).json({
+        error: {
+          code: "format_not_supported",
+          message: `Export format "${format}" is not implemented yet`,
+        },
+      });
+      return;
+    }
+
+    const conditions = [eq(schema.verificationEvents.orgId, orgId)];
+    if (agentId) conditions.push(eq(schema.verificationEvents.agentId, agentId));
+    if (status) conditions.push(eq(schema.verificationEvents.status, status));
+    if (from) conditions.push(gte(schema.verificationEvents.occurredAt, new Date(from)));
+    if (to) conditions.push(lte(schema.verificationEvents.occurredAt, new Date(to)));
+
+    const where = and(...conditions);
 
     const events = await db
       .select()
@@ -89,44 +108,78 @@ router.get("/export", async (req, res, next) => {
       .where(where)
       .orderBy(asc(schema.verificationEvents.recordedAt));
 
-    // Build export payload
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      euAiActArticles: ["12", "14", "19"],
-      filters: { agent_id, status, from, to },
-      totalRecords: events.length,
-      events,
+    const eventIds = events.map((event) => event.id);
+    const reviews =
+      eventIds.length > 0
+        ? await db
+            .select()
+            .from(schema.humanReviews)
+            .where(inArray(schema.humanReviews.eventId, eventIds))
+            .orderBy(asc(schema.humanReviews.reviewCompletedAt))
+        : [];
+
+    const generatedAt = new Date().toISOString();
+    const exportId = crypto.randomUUID();
+    const filters = {
+      agent_id: agentId,
+      status,
+      from,
+      to,
+      authority_name: authorityName,
+      authority_ref: authorityRef,
+      format,
     };
 
-    const payloadJson = JSON.stringify(payload);
-    const fileHash = sha256(payloadJson);
-    const fileSizeBytes = Buffer.byteLength(payloadJson, "utf8");
+    // Signed export chain (Art. 19): each export references the previous export's fileHash
+    const prevExports = await db
+      .select({ fileHash: schema.auditExports.fileHash })
+      .from(schema.auditExports)
+      .where(eq(schema.auditExports.orgId, orgId))
+      .orderBy(desc(schema.auditExports.requestedAt))
+      .limit(1);
+    const prevExportHash = prevExports[0]?.fileHash ?? null;
 
-    // Get org for audit log
-    const orgs = await db.select().from(schema.organizations).limit(1);
-    const orgId = orgs[0]?.id;
-
-    if (orgId) {
-      await db.insert(schema.auditExports).values({
-        orgId,
-        exportType: "full",
-        format: "json",
-        filtersApplied: { agent_id, status, from, to },
-        recordCount: events.length,
-        requestedBy: orgId,
-        requesterRole: "api",
+    const exportBody = {
+      exportId,
+      generatedAt,
+      prevExportHash,
+      recordCount: events.length,
+      filters,
+      events,
+      reviews,
+    };
+    const fileHash = sha256(JSON.stringify(exportBody));
+    const fileSizeBytes = Buffer.byteLength(
+      JSON.stringify({
+        ...exportBody,
         fileHash,
-        fileSizeBytes,
-        storagePath: "inline",
-        completedAt: new Date(),
-      });
-    }
+      }),
+      "utf8"
+    );
 
-    // EU-AI-ACT-GAP: Art. 19 — export does not support authority_name or external access tokens
+    await db.insert(schema.auditExports).values({
+      id: exportId,
+      orgId,
+      exportType: "full",
+      format,
+      filtersApplied: filters,
+      recordCount: events.length,
+      requestedBy: orgId,
+      requesterRole: "api",
+      fileHash,
+      fileSizeBytes,
+      storagePath: "inline",
+      authorityName,
+      authorityRef,
+      completedAt: new Date(),
+    });
 
     logger.info({ recordCount: events.length, fileHash }, "Audit export completed");
 
-    res.json(payload);
+    res.json({
+      ...exportBody,
+      fileHash,
+    });
   } catch (err) {
     next(err);
   }
