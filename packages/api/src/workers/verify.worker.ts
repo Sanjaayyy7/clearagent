@@ -1,10 +1,10 @@
 import { Worker, type Job } from "bullmq";
 import { Redis as IORedis } from "ioredis";
 import { db, schema } from "../db/index.js";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, asc } from "drizzle-orm";
 import { verifyTransaction, type TransactionInput } from "../verification/transaction.js";
-import { computeContentHash, computeInputHash } from "../services/hashChain.js";
-import { evaluateOversightPolicies } from "../services/oversight.js";
+import { computeContentHash, computeInputHash, computeMerkleRoot } from "../services/hashChain.js";
+import { evaluateOversightPolicies, type OversightPolicy } from "../services/oversight.js";
 import { logger } from "../logger.js";
 
 export const QUEUE_NAME = "verification";
@@ -22,6 +22,36 @@ export interface VerificationJobData {
   retentionDays: number;
 }
 
+async function writeIntegrityCheckpoint(orgId: string, jobId: string): Promise<void> {
+  // Fetch all contentHashes for this org in insertion order
+  const rows = await db
+    .select({ contentHash: schema.verificationEvents.contentHash })
+    .from(schema.verificationEvents)
+    .where(eq(schema.verificationEvents.orgId, orgId))
+    .orderBy(asc(schema.verificationEvents.recordedAt));
+
+  const hashes = rows.map((r) => r.contentHash);
+  const merkleRoot = computeMerkleRoot(hashes);
+
+  // Get the previous checkpoint ID to link the checkpoint chain
+  const prevCheckpoints = await db
+    .select({ id: schema.integrityCheckpoints.id })
+    .from(schema.integrityCheckpoints)
+    .where(eq(schema.integrityCheckpoints.orgId, orgId))
+    .orderBy(desc(schema.integrityCheckpoints.checkpointAt))
+    .limit(1);
+  const prevCheckpointId = prevCheckpoints[0]?.id ?? null;
+
+  await db.insert(schema.integrityCheckpoints).values({
+    orgId,
+    eventCount: hashes.length,
+    merkleRoot,
+    prevCheckpointId,
+  });
+
+  logger.debug({ jobId, eventCount: hashes.length, merkleRoot }, "Integrity checkpoint written");
+}
+
 async function processVerification(job: Job<VerificationJobData>): Promise<void> {
   const data = job.data;
   const log = logger.child({ jobId: data.jobId, bullJobId: job.id });
@@ -37,11 +67,17 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
     const occurredAt = new Date();
     const inputHash = computeInputHash(data.inputPayload);
 
+    // Load active oversight policies from DB (Art. 14 — configurable review triggers)
+    const activePolicies = await db
+      .select({ id: schema.oversightPolicies.id, name: schema.oversightPolicies.name, triggerConditions: schema.oversightPolicies.triggerConditions, reviewerRole: schema.oversightPolicies.reviewerRole })
+      .from(schema.oversightPolicies)
+      .where(and(eq(schema.oversightPolicies.orgId, data.orgId), eq(schema.oversightPolicies.isActive, true)));
+
     // Evaluate oversight policies
-    const oversight = evaluateOversightPolicies({
-      confidence: result.confidence,
-      decision: result.decision,
-    });
+    const oversight = evaluateOversightPolicies(
+      { confidence: result.confidence, decision: result.decision },
+      activePolicies as OversightPolicy[]
+    );
 
     const finalStatus = result.decision === "approved" ? "verified" : result.decision === "rejected" ? "failed" : "flagged";
 
@@ -101,6 +137,12 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
 
     // Mark job completed
     await db.update(schema.jobs).set({ status: "completed", eventId: event.id, updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));
+
+    // Write Merkle checkpoint (Art. 12 + 19 — integrity snapshot after each event)
+    // Best-effort: failure here does not fail the verification job
+    void writeIntegrityCheckpoint(data.orgId, data.jobId).catch((err) => {
+      log.warn({ err }, "Failed to write integrity checkpoint — non-critical");
+    });
 
     log.info({ eventId: event.id, decision: result.decision, confidence: result.confidence, requiresReview: oversight.requiresReview }, "Verification complete");
   } catch (err) {

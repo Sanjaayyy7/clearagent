@@ -40,3 +40,96 @@ jobs:
 
       - name: Lint
         run: npm run lint --workspaces --if-present
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: packages/api
+        run: npx vitest run src/__tests__/hashchain.unit.test.ts
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: clearagent
+          POSTGRES_PASSWORD: clearagent
+          POSTGRES_DB: clearagent
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql://clearagent:clearagent@localhost:5432/clearagent
+      REDIS_URL: redis://localhost:6379
+      API_KEY_SECRET: ci-test-secret
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build --workspaces --if-present
+
+      - name: Run database migrations
+        working-directory: packages/api
+        run: npm run db:migrate
+
+      - name: Seed database
+        working-directory: packages/api
+        run: npm run seed
+
+      - name: Start API server
+        working-directory: packages/api
+        run: node dist/index.js &
+
+      - name: Wait for API to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/v1/health; then
+              echo "API is healthy"
+              break
+            fi
+            echo "Waiting for API... attempt $i"
+            sleep 2
+          done
+
+      - name: Run integration tests
+        working-directory: packages/api
+        env:
+          API_URL: http://localhost:3000
+          API_KEY: ca_test_demo_key_clearagent_2026
+        run: npx vitest run src/__tests__/hashchain.test.ts src/__tests__/humanreview.test.ts src/__tests__/agentsuspend.test.ts
