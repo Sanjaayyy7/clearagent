@@ -32,7 +32,7 @@ The design is intentionally narrow: ClearAgent verifies and records. It does not
      │                           │◄────────────│
      │  GET /v1/jobs/:jobId      │   PG NOTIFY → SSE stream
      │──────────────────────────►│
-     │  { status, contentHash }  │
+     │  { status, eventId }      │
      │◄──────────────────────────│
 
   Dashboard ──── SSE ─────────────► Real-time event feed
@@ -57,6 +57,36 @@ npm install && npm run db:migrate && npm run seed && npm run dev
 
 API live: http://localhost:3000/v1/health  
 Dashboard live: http://localhost:5173
+Landing page live: http://localhost:3001
+
+## Local URLs
+
+- `http://localhost:3000` — API
+  - Health check: `/v1/health`
+- `http://localhost:5173` — ClearAgent Dashboard
+  - Expected UI: left sidebar with `Live Feed`, `Integrity Report`, and `Agent Management`
+  - Expected browser title: `ClearAgent Dashboard — Verification Console`
+- `http://localhost:3001` — ClearAgent Landing Page
+  - Expected UI: marketing site / product homepage
+
+### Local startup commands
+
+```bash
+# API
+npm run dev:api
+
+# Dashboard
+npm run dev:dashboard
+
+# Landing page
+npm run dev:landing
+```
+
+### Troubleshooting
+
+- If `http://localhost:5173` shows a marketing page, you are not looking at the dashboard package.
+- The dashboard now claims `5173` with a strict port. If that port is occupied, startup should fail instead of silently drifting.
+- The landing page is a separate app on `3001`.
 
 ```bash
 # Verify it works — submit a test event
@@ -71,7 +101,7 @@ curl -X POST http://localhost:3000/v1/events/verify \
       "purpose": "Q2 software license renewal"
     }
   }'
-# → { "jobId": "...", "status": "queued" }
+# → { "jobId": "...", "message": "Verification queued. Poll GET /v1/jobs/:jobId for result." }
 ```
 
 ## EU AI Act Compliance
@@ -101,6 +131,7 @@ Enforcement deadline: **August 2026**. See [docs/eu-ai-act-guide.md](docs/eu-ai-
 | GET | `/v1/events/stream` | ✓ | Real-time SSE stream |
 | GET | `/v1/jobs/:jobId` | ✓ | Poll async job status |
 | POST | `/v1/reviews` | ✓ | Submit human review (Art. 14) |
+| GET | `/v1/agents` | ✓ | List registered agents |
 | GET | `/v1/audit/integrity` | ✓ | Hash chain status + Merkle root |
 | GET | `/v1/audit/export` | ✓ | Export compliance package (Art. 19) |
 | POST | `/v1/agents/register` | ✓ | Register agent under oversight |
@@ -180,15 +211,53 @@ Available tools:
 
 - [x] TypeScript SDK (`ClearAgentClient`)
 - [x] MCP server (4 tools)
+- [x] Multi-tenant isolation (auth-scoped queries)
+- [x] Rate limiting (200 req/min)
+- [x] Reviewer non-repudiation (review hash bound to event hash)
+- [x] Signed export chain (prevExportHash)
+- [x] DB-wired oversight policies (configurable thresholds)
+- [x] Merkle checkpoints after each event
+- [x] CI with integration tests (postgres:16 + redis:7)
+- [ ] `npm` publish: `@clearagent/sdk`, `@clearagent/mcp-server`
+- [ ] XML export (some regulators require non-JSON)
+- [ ] Retention enforcement cron (auto-purge expired events)
+- [ ] RFC 3161 external timestamp anchoring
 - [ ] Identity verification domain
-- [ ] Authorization verification domain
 - [ ] Webhook delivery with HMAC signing
-- [ ] Multi-tenant RBAC
-- [ ] XML export (regulatory format)
-- [ ] Retention enforcement cron
-- [ ] RFC 3161 timestamp anchoring
-- [ ] Dockerfile + production deployment guide
-- [ ] `npm` package: `@clearagent/sdk`
+
+## 90-Day Roadmap
+
+> Targeting v2.0.0 launch-ready by July 2026, ahead of August EU AI Act enforcement.
+
+**April 2026 — Trust infrastructure (v1.0–v1.2)**
+- [x] Hash chain race condition fixed (pg_advisory_xact_lock)
+- [x] 30+ unit tests for hash chain cryptography
+- [x] CI with full integration test suite
+- [x] Reviewer non-repudiation and signed export chain
+- [x] Multi-tenant isolation, rate limiting
+- [x] Configurable oversight policies from DB
+- [x] Escalated reviews dashboard (Art. 14 SLA tracking)
+
+**May 2026 — Distribution (v1.3)**
+- [ ] Publish `@clearagent/sdk` to npm
+- [ ] Publish `@clearagent/mcp-server` to npm
+- [ ] Design partner onboarding (5 companies, target: fin-services, healthcare, HR)
+- [ ] SOC 2 Type 1 audit initiated
+- [ ] XML export for regulators requiring non-JSON audit packages
+
+**June 2026 — Hardening (v1.4–v1.9)**
+- [ ] Retention enforcement cron (auto-purge with audit log)
+- [ ] RFC 3161 external timestamp anchoring for `integrity_checkpoints`
+- [ ] Multi-tenant RBAC (org-level roles, not just API key scoping)
+- [ ] Review SLA enforcement with BullMQ delayed jobs and escalation
+- [ ] Load test: 10,000 events/hour hash chain correctness validation
+- [ ] Production deployment guide (Railway, Fly.io, self-hosted)
+
+**July–August 2026 — Launch (v2.0)**
+- [ ] OSS launch: ProductHunt, HN, dev.to
+- [ ] `@clearagent/sdk` npm downloads baseline established
+- [ ] First 3 design partners in production before August 2026 deadline
+- [ ] Public compliance attestation: "ClearAgent hash chain verified by [external auditor]"
 
 ## Contributing
 
