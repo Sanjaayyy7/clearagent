@@ -21,7 +21,7 @@ FROM deps AS builder
 COPY tsconfig.base.json ./
 COPY packages/api/src ./packages/api/src
 COPY packages/api/tsconfig.json ./packages/api/
-RUN npm run build --workspace=packages/api
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/api
 
 # ─── Stage 4: runner ─────────────────────────────────────────
 FROM base AS runner
@@ -36,7 +36,7 @@ COPY packages/api/package.json ./packages/api/
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
   CMD wget -qO- http://localhost:3000/v1/health || exit 1
 
 CMD ["dumb-init", "node", "packages/api/dist/index.js"]

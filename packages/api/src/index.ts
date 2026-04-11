@@ -142,24 +142,38 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 // ─── Start ───────────────────────────────────────────────────
+// Verify worker starts immediately — handles inbound requests
 const worker = startWorker(redisConnection);
-const slaWorker = startSlaWorker(redisConnection);
-const retentionWorker = startRetentionWorker(redisConnection);
-scheduleRetentionPurge(redisConnection).catch((err) => logger.warn({ err }, "Failed to schedule retention purge"));
+
+// SLA + retention workers deferred in production to reduce memory spike on boot
+let slaWorker: ReturnType<typeof startSlaWorker>;
+let retentionWorker: ReturnType<typeof startRetentionWorker>;
+
+const SLA_DELAY = process.env.NODE_ENV === "production" ? 10_000 : 0;
+const RETENTION_DELAY = process.env.NODE_ENV === "production" ? 20_000 : 0;
+
+setTimeout(() => {
+  slaWorker = startSlaWorker(redisConnection);
+  logger.info("SLA enforcement worker started (Art. 14)");
+}, SLA_DELAY);
+
+setTimeout(() => {
+  retentionWorker = startRetentionWorker(redisConnection);
+  scheduleRetentionPurge(redisConnection).catch((err) => logger.warn({ err }, "Failed to schedule retention purge"));
+  logger.info("Retention purge worker started (daily 02:00 UTC)");
+}, RETENTION_DELAY);
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, "ClearAgent API server running");
-  logger.info("Verification worker started (concurrency: 5)");
-  logger.info("SLA enforcement worker started (Art. 14)");
-  logger.info("Retention purge worker started (daily 02:00 UTC)");
+  logger.info(`Verification worker started (concurrency: ${process.env.NODE_ENV === "production" ? 2 : 5})`);
 });
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   logger.info("Shutting down...");
   await worker.close();
-  await slaWorker.close();
-  await retentionWorker.close();
+  if (slaWorker) await slaWorker.close();
+  if (retentionWorker) await retentionWorker.close();
   await verificationQueue.close();
   await redisConnection.quit();
   process.exit(0);

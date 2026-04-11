@@ -191,7 +191,7 @@ export function startWorker(redisConnection: IORedis): Worker<VerificationJobDat
 
   const worker = new Worker<VerificationJobData>(QUEUE_NAME, processVerification, {
     connection: redisConnection,
-    concurrency: 5,
+    concurrency: process.env.NODE_ENV === "production" ? 2 : 5,
   });
 
   worker.on("completed", (job) => {
