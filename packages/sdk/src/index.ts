@@ -1,4 +1,4 @@
-export const VERSION = "0.2.0";
+export const VERSION = "1.0.0";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -92,6 +92,24 @@ export interface AuditIntegrity {
   merkleRoot: string;
   checkedAt: string;
   brokenAt: string | null;
+}
+
+export interface OversightPolicy {
+  id: string;
+  orgId: string;
+  name: string;
+  description: string | null;
+  triggerConditions: Record<string, unknown>;
+  requiredAction: string;
+  slaSeconds: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AttestationToken {
+  attestationToken: string;
+  expiresIn: number;
+  agentId: string;
 }
 
 export interface AuditExport {
@@ -207,6 +225,32 @@ class AgentsResource {
 
   flag(agentId: string): Promise<{ agentId: string; status: string }> {
     return this.http.patch(`/v1/agents/${agentId}/status`, { status: "flagged" });
+  }
+
+  attest(agentId: string): Promise<AttestationToken> {
+    return this.http.post<AttestationToken>(`/v1/agents/${agentId}/attest`, {});
+  }
+}
+
+class PoliciesResource {
+  constructor(private readonly http: HttpClient) {}
+
+  list(): Promise<OversightPolicy[]> {
+    return this.http.get<OversightPolicy[]>("/v1/policies");
+  }
+
+  create(data: {
+    name: string;
+    description?: string;
+    triggerConditions: Record<string, unknown>;
+    requiredAction: string;
+    slaSeconds?: number;
+  }): Promise<OversightPolicy> {
+    return this.http.post<OversightPolicy>("/v1/policies", data);
+  }
+
+  deactivate(policyId: string): Promise<OversightPolicy> {
+    return this.http.patch<OversightPolicy>(`/v1/policies/${policyId}`, { isActive: false });
   }
 }
 
@@ -343,6 +387,7 @@ export class ClearAgentClient {
   readonly jobs: JobsResource;
   readonly reviews: ReviewsResource;
   readonly audit: AuditResource;
+  readonly policies: PoliciesResource;
 
   constructor(config: ClearAgentConfig) {
     const http = new HttpClient(config);
@@ -351,6 +396,7 @@ export class ClearAgentClient {
     this.jobs = new JobsResource(http);
     this.reviews = new ReviewsResource(http);
     this.audit = new AuditResource(http);
+    this.policies = new PoliciesResource(http);
   }
 }
 

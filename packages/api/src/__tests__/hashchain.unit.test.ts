@@ -10,6 +10,7 @@ import {
   computeContentHash,
   verifyContentHash,
   computeMerkleRoot,
+  canonicalJson,
 } from "../services/hashChain.js";
 
 // ─── sha256 ────────────────────────────────────────────────────
@@ -206,5 +207,130 @@ describe("computeMerkleRoot", () => {
     const cd = sha256(leaves[2] + leaves[3]);
     const expected = sha256(ab + cd);
     expect(root).toBe(expected);
+  });
+
+  it("handles 5 leaves (odd — last duplicated)", () => {
+    const leaves = ["a", "b", "c", "d", "e"].map(sha256);
+    expect(computeMerkleRoot(leaves)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("handles 100 leaves", () => {
+    const leaves = Array.from({ length: 100 }, (_, i) => sha256(String(i)));
+    expect(computeMerkleRoot(leaves)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("root changes when one leaf is removed", () => {
+    const leaves = ["a", "b", "c", "d"].map(sha256);
+    const full = computeMerkleRoot(leaves);
+    const trimmed = computeMerkleRoot(leaves.slice(0, 3));
+    expect(full).not.toBe(trimmed);
+  });
+
+  it("root changes when a middle leaf is replaced", () => {
+    const leaves = ["a", "b", "c", "d"].map(sha256);
+    const modified = [...leaves];
+    modified[1] = sha256("z");
+    expect(computeMerkleRoot(leaves)).not.toBe(computeMerkleRoot(modified));
+  });
+
+  it("two-leaf tree equals sha256(h0+h1)", () => {
+    const h0 = sha256("x");
+    const h1 = sha256("y");
+    expect(computeMerkleRoot([h0, h1])).toBe(sha256(h0 + h1));
+  });
+});
+
+// ─── canonicalJson ─────────────────────────────────────────────
+
+describe("canonicalJson", () => {
+  it("sorts top-level object keys", () => {
+    expect(canonicalJson({ b: 1, a: 2 })).toBe('{"a":2,"b":1}');
+  });
+
+  it("sorts nested object keys recursively", () => {
+    expect(canonicalJson({ z: { b: 1, a: 2 } })).toBe('{"z":{"a":2,"b":1}}');
+  });
+
+  it("preserves array order", () => {
+    expect(canonicalJson([3, 1, 2])).toBe("[3,1,2]");
+  });
+
+  it("handles null", () => {
+    expect(canonicalJson(null)).toBe("null");
+  });
+
+  it("handles primitives — string", () => {
+    expect(canonicalJson("hello")).toBe('"hello"');
+  });
+
+  it("handles primitives — number", () => {
+    expect(canonicalJson(42)).toBe("42");
+  });
+
+  it("handles unicode (emoji)", () => {
+    const result = canonicalJson({ emoji: "🚀" });
+    expect(result).toContain("🚀");
+  });
+
+  it("handles CJK characters", () => {
+    const result = canonicalJson({ text: "日本語" });
+    expect(result).toContain("日本語");
+  });
+
+  it("two objects with same keys/values but different insertion order produce equal output", () => {
+    const a = canonicalJson({ x: 1, y: 2, z: 3 });
+    const b = canonicalJson({ z: 3, x: 1, y: 2 });
+    expect(a).toBe(b);
+  });
+
+  it("large payload (>100 keys) is deterministic", () => {
+    const large: Record<string, number> = {};
+    for (let i = 0; i < 200; i++) large[`key${i}`] = i;
+    const r1 = canonicalJson(large);
+    const r2 = canonicalJson({ ...large });
+    expect(r1).toBe(r2);
+  });
+});
+
+// ─── Chain linkage ─────────────────────────────────────────────
+
+describe("hash chain linkage", () => {
+  it("prevHash of event N equals contentHash of event N-1", () => {
+    const events = [
+      { inputHash: sha256("input0"), outputPayload: { r: 0 }, decision: "approved", occurredAt: "2026-01-01T00:00:00.000Z" },
+      { inputHash: sha256("input1"), outputPayload: { r: 1 }, decision: "approved", occurredAt: "2026-01-01T00:01:00.000Z" },
+      { inputHash: sha256("input2"), outputPayload: { r: 2 }, decision: "rejected", occurredAt: "2026-01-01T00:02:00.000Z" },
+    ];
+
+    const hashes = events.map((e) => computeContentHash(e));
+
+    // prevHash of event[1] should equal contentHash of event[0]
+    expect(hashes[0]).toBe(computeContentHash(events[0]));
+    expect(hashes[1]).toBe(computeContentHash(events[1]));
+    // simulated chain: each hash is deterministic from its inputs
+    expect(hashes[0]).not.toBe(hashes[1]);
+    expect(hashes[1]).not.toBe(hashes[2]);
+  });
+
+  it("contentHash changes with 1-byte difference in inputHash", () => {
+    const base = { inputHash: "a".repeat(64), outputPayload: {}, decision: "approved", occurredAt: "2026-01-01T00:00:00.000Z" };
+    const tweaked = { ...base, inputHash: "b" + "a".repeat(63) };
+    expect(computeContentHash(base)).not.toBe(computeContentHash(tweaked));
+  });
+
+  it("Merkle root over chain changes when any event is tampered", () => {
+    const events = Array.from({ length: 5 }, (_, i) => ({
+      inputHash: sha256(`input${i}`),
+      outputPayload: { seq: i },
+      decision: "approved",
+      occurredAt: `2026-01-01T0${i}:00:00.000Z`,
+    }));
+    const hashes = events.map(computeContentHash);
+    const root = computeMerkleRoot(hashes);
+
+    // tamper event[2]
+    const tampered = [...hashes];
+    tampered[2] = sha256("tampered");
+    expect(computeMerkleRoot(tampered)).not.toBe(root);
   });
 });

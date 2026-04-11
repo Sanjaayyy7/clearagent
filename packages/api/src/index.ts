@@ -11,11 +11,21 @@ import { reviewsRouter } from "./routes/reviews.js";
 import { agentsRouter } from "./routes/agents.js";
 import { auditRouter } from "./routes/audit.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { db } from "./db/index.js";
+import { schema } from "./db/index.js";
+import { sql as sqlExpr, desc as descExpr } from "drizzle-orm";
 import { startWorker, QUEUE_NAME } from "./workers/verify.worker.js";
 import { startSlaWorker } from "./workers/sla.worker.js";
 import { startRetentionWorker, scheduleRetentionPurge } from "./workers/retention.worker.js";
 import { policiesRouter } from "./routes/policies.js";
+import { complianceRouter } from "./routes/compliance.js";
+import { requestIdMiddleware } from "./middleware/requestId.js";
 import { logger } from "./logger.js";
+
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET must be set in production");
+  process.exit(1);
+}
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -62,20 +72,27 @@ const registerLimiter = rateLimit({
 app.use("/v1/events/verify", verifyLimiter);
 app.use("/v1/agents/register", registerLimiter);
 
-const _corsOrigins = process.env.CORS_ORIGINS;
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3001",
+  process.env.DASHBOARD_URL,
+  process.env.LANDING_URL,
+  process.env.CORS_EXTRA_ORIGIN,
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: _corsOrigins === "*" || !_corsOrigins
-    ? "*"
-    : _corsOrigins.split(",").map((o) => o.trim()),
-  credentials: false,
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // curl / Railway health checks
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["X-Request-ID"],
 }));
 app.use(express.json());
-
-// Request ID tracking
-app.use((req, _res, next) => {
-  (req as any).requestId = req.headers["x-request-id"] || crypto.randomUUID();
-  next();
-});
+app.use(requestIdMiddleware);
 
 // ─── Public routes ───────────────────────────────────────────
 app.get("/v1/health", (_req, res) => {
@@ -94,6 +111,24 @@ app.use("/v1/reviews", authMiddleware, reviewsRouter);
 app.use("/v1/agents", authMiddleware, agentsRouter);
 app.use("/v1/audit", authMiddleware, auditRouter);
 app.use("/v1/policies", authMiddleware, policiesRouter);
+app.use("/v1/compliance", authMiddleware, complianceRouter);
+
+// ─── Public metrics (no auth) ────────────────────────────────
+app.get("/v1/metrics", async (_req, res, next) => {
+  try {
+    const [eventRow] = await db.select({ count: sqlExpr<number>`count(*)::int` }).from(schema.verificationEvents);
+    const [checkpoint] = await db.select({ merkleRoot: schema.integrityCheckpoints.merkleRoot }).from(schema.integrityCheckpoints).orderBy(descExpr(schema.integrityCheckpoints.checkpointAt)).limit(1);
+    res.json({
+      events: eventRow?.count ?? 0,
+      chain: { merkleRoot: checkpoint?.merkleRoot ?? null },
+      uptime: process.uptime(),
+      version: "0.1.0",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── Error handler ───────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

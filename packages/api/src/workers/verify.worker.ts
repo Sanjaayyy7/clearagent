@@ -6,6 +6,7 @@ import { eq, desc, sql, and, asc } from "drizzle-orm";
 import { verifyTransaction, type TransactionInput } from "../verification/transaction.js";
 import { computeContentHash, computeInputHash, computeMerkleRoot } from "../services/hashChain.js";
 import { evaluateOversightPolicies, type OversightPolicy } from "../services/oversight.js";
+import { requestRFC3161Timestamp } from "../services/timestampAnchor.js";
 import { logger } from "../logger.js";
 
 export const QUEUE_NAME = "verification";
@@ -144,20 +145,12 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
 
     // Enqueue SLA enforcement job if review required (Art. 14)
     if (oversight.requiresReview && slaQueue) {
-      // Find the slaSeconds from the matching policy (default 3600s = 1 hour)
-      const matchingPolicy = (activePolicies as Array<{ name: string; slaSeconds?: number | null }>).find((p) => {
-        const cond = p as unknown as { triggerConditions?: { confidence_below?: number; decision?: string } };
-        const tc = cond?.triggerConditions;
-        if (!tc) return false;
-        if (typeof tc.confidence_below === "number" && result.confidence !== null && result.confidence < tc.confidence_below) return true;
-        if (typeof tc.decision === "string" && result.decision === tc.decision) return true;
-        return false;
-      });
-      const slaSeconds = (matchingPolicy as any)?.slaSeconds ?? 3600;
-      const policyName = (matchingPolicy as any)?.name ?? "default";
+      const slaSeconds = oversight.slaSeconds ?? 3600;
+      const policyId = oversight.policyId ?? null;
+      const policyName = oversight.policyName ?? "default";
       void slaQueue.add(
         "escalate",
-        { eventId: event.id, orgId: data.orgId, policyName, slaSeconds },
+        { eventId: event.id, orgId: data.orgId, policyId, policyName, slaSeconds },
         { delay: slaSeconds * 1000, attempts: 3, backoff: { type: "exponential", delay: 5000 } }
       ).catch((err) => log.warn({ err }, "Failed to enqueue SLA job — non-critical"));
     }
@@ -166,6 +159,22 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
     // Best-effort: failure here does not fail the verification job
     void writeIntegrityCheckpoint(data.orgId, data.jobId).catch((err) => {
       log.warn({ err }, "Failed to write integrity checkpoint — non-critical");
+    });
+
+    // RFC 3161 external timestamp anchoring (Art. 12 enhancement) — fire and forget
+    setImmediate(async () => {
+      try {
+        const anchor = await requestRFC3161Timestamp(event.contentHash);
+        if (anchor) {
+          await db
+            .update(schema.integrityCheckpoints)
+            .set({ externalAnchor: anchor.token, anchorService: anchor.anchorService })
+            .where(eq(schema.integrityCheckpoints.orgId, data.orgId));
+          log.info({ eventId: event.id }, "RFC 3161 timestamp anchored");
+        }
+      } catch (err) {
+        log.warn({ err }, "RFC 3161 anchoring failed (non-critical)");
+      }
     });
 
     log.info({ eventId: event.id, decision: result.decision, confidence: result.confidence, requiresReview: oversight.requiresReview }, "Verification complete");

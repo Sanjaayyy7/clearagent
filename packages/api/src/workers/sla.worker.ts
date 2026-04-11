@@ -17,6 +17,7 @@ export const SLA_QUEUE_NAME = "sla-enforcement";
 export interface SlaJobData {
   eventId: string;
   orgId: string;
+  policyId: string | null;
   policyName: string;
   slaSeconds: number;
 }

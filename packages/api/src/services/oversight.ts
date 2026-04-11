@@ -8,6 +8,7 @@ export type OversightPolicy = {
   name: string;
   triggerConditions: PolicyTriggerConditions | Record<string, unknown>;
   reviewerRole: string;
+  slaSeconds?: number | null;
 };
 
 /**
@@ -18,7 +19,7 @@ export type OversightPolicy = {
 export function evaluateOversightPolicies(
   params: { confidence: number | null; decision: string },
   policies?: OversightPolicy[]
-): { requiresReview: boolean; reason?: string } {
+): { requiresReview: boolean; policyId?: string; policyName?: string; slaSeconds?: number; reason?: string } {
   if (policies && policies.length > 0) {
     for (const policy of policies) {
       const cond = policy.triggerConditions as PolicyTriggerConditions;
@@ -30,6 +31,9 @@ export function evaluateOversightPolicies(
       ) {
         return {
           requiresReview: true,
+          policyId: policy.id,
+          policyName: policy.name,
+          slaSeconds: policy.slaSeconds ?? 3600,
           reason: `Policy "${policy.name}": confidence ${params.confidence} below threshold ${cond.confidence_below}`,
         };
       }
@@ -37,6 +41,9 @@ export function evaluateOversightPolicies(
       if (typeof cond.decision === "string" && params.decision === cond.decision) {
         return {
           requiresReview: true,
+          policyId: policy.id,
+          policyName: policy.name,
+          slaSeconds: policy.slaSeconds ?? 3600,
           reason: `Policy "${policy.name}": decision "${params.decision}" matches trigger`,
         };
       }
@@ -44,7 +51,7 @@ export function evaluateOversightPolicies(
 
     // Safety net: flagged decisions always require review regardless of configured policies
     if (params.decision === "flagged") {
-      return { requiresReview: true, reason: "Decision was flagged for review" };
+      return { requiresReview: true, policyName: "default", slaSeconds: 3600, reason: "Decision was flagged for review" };
     }
 
     return { requiresReview: false };
@@ -54,6 +61,8 @@ export function evaluateOversightPolicies(
   if (params.confidence !== null && params.confidence < 0.85) {
     return {
       requiresReview: true,
+      policyName: "default",
+      slaSeconds: 3600,
       reason: `Confidence score ${params.confidence} is below threshold 0.85`,
     };
   }
@@ -61,6 +70,8 @@ export function evaluateOversightPolicies(
   if (params.decision === "flagged") {
     return {
       requiresReview: true,
+      policyName: "default",
+      slaSeconds: 3600,
       reason: "Decision was flagged for review",
     };
   }

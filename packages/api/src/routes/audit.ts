@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db, schema } from "../db/index.js";
-import { asc, desc, and, eq, gte, inArray, lte } from "drizzle-orm";
-import { computeContentHash, computeMerkleRoot, sha256 } from "../services/hashChain.js";
+import { asc, desc, and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { computeContentHash, computeMerkleRoot, sha256, canonicalJson } from "../services/hashChain.js";
 import { logger } from "../logger.js";
 import { XMLBuilder } from "fast-xml-parser";
+import { nanoid } from "nanoid";
 
 const router = Router();
 
@@ -236,6 +237,96 @@ router.get("/export", async (req, res, next) => {
         fileHash,
       });
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /v1/audit/integrity/report — formal hash chain verification report (Art. 12)
+router.get("/integrity/report", async (req, res, next) => {
+  try {
+    const auth = (req as any).auth;
+    const orgId: string = auth.orgId;
+
+    // Re-use existing integrity check
+    const events = await db
+      .select({ id: schema.verificationEvents.id, inputHash: schema.verificationEvents.inputHash, outputPayload: schema.verificationEvents.outputPayload, decision: schema.verificationEvents.decision, occurredAt: schema.verificationEvents.occurredAt, contentHash: schema.verificationEvents.contentHash, prevHash: schema.verificationEvents.prevHash })
+      .from(schema.verificationEvents)
+      .where(eq(schema.verificationEvents.orgId, orgId))
+      .orderBy(asc(schema.verificationEvents.recordedAt));
+
+    let brokenAt: string | null = null;
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const expectedHash = computeContentHash({ inputHash: event.inputHash, outputPayload: event.outputPayload, decision: event.decision, occurredAt: event.occurredAt.toISOString() });
+      if (event.contentHash !== expectedHash) { brokenAt = event.id; break; }
+      if (i > 0 && event.prevHash !== events[i - 1].contentHash) { brokenAt = event.id; break; }
+    }
+
+    const checkpoints = await db
+      .select()
+      .from(schema.integrityCheckpoints)
+      .where(eq(schema.integrityCheckpoints.orgId, orgId))
+      .orderBy(asc(schema.integrityCheckpoints.checkpointAt));
+
+    const [anchoredCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.integrityCheckpoints)
+      .where(and(eq(schema.integrityCheckpoints.orgId, orgId), isNotNull(schema.integrityCheckpoints.externalAnchor)));
+
+    const hashes = events.map((e) => e.contentHash);
+    const merkleRoot = computeMerkleRoot(hashes);
+
+    const report = {
+      reportType: "hash_chain_verification",
+      reportVersion: "1.0",
+      generatedAt: new Date().toISOString(),
+      generatedBy: "ClearAgent API v0.1.0",
+      organization: orgId,
+      summary: {
+        chainStatus: brokenAt === null ? "intact" : "broken",
+        totalEvents: events.length,
+        merkleRoot,
+        checkpointsVerified: checkpoints.length,
+        rfc3161Anchored: anchoredCount?.count ?? 0,
+        brokenAt,
+      },
+      verification: {
+        method: "SHA-256 hash chain with Merkle root",
+        euAiActArticle: "Article 12 — Logging and Traceability",
+        integrityGuarantee: "Append-only PostgreSQL with trigger-level immutability",
+      },
+      checkpoints: checkpoints.map((c) => ({
+        id: c.id,
+        eventCount: c.eventCount,
+        merkleRoot: c.merkleRoot,
+        checkedAt: c.checkpointAt,
+        rfc3161Anchored: !!c.externalAnchor,
+        anchorService: c.anchorService ?? null,
+      })),
+    };
+
+    const reportHash = sha256(canonicalJson(report));
+
+    // Log report generation to audit_exports
+    await db.insert(schema.auditExports).values({
+      id: nanoid(),
+      orgId,
+      exportType: "integrity_report",
+      format: "json",
+      filtersApplied: {},
+      recordCount: events.length,
+      requestedBy: orgId,
+      requesterRole: "compliance",
+      fileHash: reportHash,
+      fileSizeBytes: Buffer.byteLength(JSON.stringify({ ...report, reportHash }), "utf8"),
+      storagePath: "api-generated",
+      completedAt: new Date(),
+    });
+
+    logger.info({ orgId, totalEvents: events.length, chainStatus: report.summary.chainStatus, reportHash }, "Integrity report generated");
+
+    res.json({ ...report, reportHash });
   } catch (err) {
     next(err);
   }

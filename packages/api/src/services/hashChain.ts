@@ -20,7 +20,7 @@ export function computeInputHash(inputPayload: unknown): string {
  * Sorts object keys to ensure deterministic output regardless of insertion order
  * (necessary because PostgreSQL JSONB storage reorders keys).
  */
-function canonicalJson(value: unknown): string {
+export function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   const sorted = Object.keys(value as Record<string, unknown>)

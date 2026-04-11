@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { db, schema } from "../db/index.js";
 import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { validate } from "../middleware/validate.js";
@@ -162,6 +163,50 @@ router.patch("/:agentId/status", validate(updateStatusSchema), async (req, res, 
       status: updated.status,
       name: updated.name,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/agents/:agentId/attest — issue a signed attestation JWT (Art. 12 identity binding)
+router.post("/:agentId/attest", async (req, res, next) => {
+  try {
+    const auth = (req as any).auth;
+    const { agentId } = req.params;
+
+    const [agent] = await db
+      .select()
+      .from(schema.agents)
+      .where(and(eq(schema.agents.id, agentId as string), eq(schema.agents.orgId, auth.orgId)));
+
+    if (!agent) {
+      res.status(404).json({ error: { code: "agent_not_found", message: `Agent ${agentId} not found` } });
+      return;
+    }
+
+    if (agent.status !== "active") {
+      res.status(403).json({ error: { code: "agent_not_active", message: `Agent is ${agent.status} — only active agents can attest` } });
+      return;
+    }
+
+    const secret = `${process.env.JWT_SECRET ?? "dev-secret-change-in-production"}:${auth.orgId}`;
+
+    const attestationToken = jwt.sign(
+      {
+        sub: agent.id,
+        orgId: agent.orgId,
+        externalId: agent.externalId,
+        modelProvider: agent.modelProvider,
+        status: agent.status,
+        type: "agent_attestation",
+      },
+      secret,
+      { expiresIn: "1h", issuer: "clearagent", audience: "verification" }
+    );
+
+    logger.info({ agentId: agent.id }, "Agent attestation token issued");
+
+    res.json({ attestationToken, expiresIn: 3600, agentId: agent.id });
   } catch (err) {
     next(err);
   }
