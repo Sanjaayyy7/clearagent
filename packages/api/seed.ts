@@ -160,7 +160,7 @@ async function seed() {
   const demoApiKey = process.env.DEMO_API_KEY || "ca_test_demo_key_clearagent_2026";
   await db.insert(schema.apiKeys).values({
     orgId: org.id,
-    agentId: procurementAgent.id,
+    agentId: null,  // org-level key — allows submitting events for any agent within the org
     keyHash: await bcrypt.hash(demoApiKey, 10),
     keyPrefix: demoApiKey.slice(0, 12),
     lastFour: demoApiKey.slice(-4),

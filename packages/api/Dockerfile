@@ -31,7 +31,6 @@ WORKDIR /app
 
 COPY --from=builder /app/packages/api/dist ./packages/api/dist
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/api/node_modules ./packages/api/node_modules
 COPY package.json ./
 COPY packages/api/package.json ./packages/api/
 
