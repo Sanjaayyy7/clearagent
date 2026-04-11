@@ -11,26 +11,29 @@ COPY packages/sdk/package.json ./packages/sdk/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 COPY packages/landing/package.json ./packages/landing/
 
-RUN npm ci --workspace=packages/mcp-server --include-workspace-root
+RUN npm ci --workspace=packages/sdk --include-workspace-root
 
 # ─── Stage 2: builder ────────────────────────────────────────
 FROM deps AS builder
 COPY tsconfig.base.json ./
-COPY packages/mcp-server ./packages/mcp-server/
+COPY packages/sdk ./packages/sdk/
 
-RUN npm run build --workspace=packages/mcp-server
+RUN npm run build --workspace=packages/sdk
 
 # ─── Stage 3: runner ─────────────────────────────────────────
 FROM node:20-alpine AS runner
-RUN apk add --no-cache dumb-init
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /app/packages/mcp-server/dist ./packages/mcp-server/dist
+COPY --from=builder /app/packages/sdk/dist ./packages/sdk/dist
+COPY packages/sdk/health.cjs ./packages/sdk/health.cjs
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
-COPY packages/mcp-server/package.json ./packages/mcp-server/
+COPY packages/sdk/package.json ./packages/sdk/
 
 EXPOSE 3000
 
-CMD ["dumb-init", "node", "packages/mcp-server/dist/index.js"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- "http://localhost:${PORT:-3000}/v1/health" || exit 1
+
+CMD ["node", "packages/sdk/health.cjs"]

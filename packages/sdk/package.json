@@ -1,5 +1,5 @@
 {
-  "name": "@clearagents/sdk",
+  "name": "@clearagent/sdk",
   "version": "1.0.0",
   "files": [
     "dist",
@@ -16,6 +16,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "start": "node health.cjs",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

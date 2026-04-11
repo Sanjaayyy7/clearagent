@@ -1,11 +1,26 @@
 #!/usr/bin/env node
 
+import { createServer } from "http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+
+// HTTP health server — satisfies Railway healthcheck at /v1/health
+// Runs alongside the stdio MCP transport (non-blocking)
+const healthPort = parseInt(process.env.PORT ?? "3001", 10);
+createServer((req, res) => {
+  if (req.url === "/v1/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ status: "ok", service: "mcp-server", version: "0.2.0" }));
+  }
+  res.writeHead(404);
+  res.end();
+}).listen(healthPort, () => {
+  process.stderr.write(`ClearAgent MCP health server on port ${healthPort}\n`);
+});
 
 const API_URL = (process.env["CLEARAGENT_API_URL"] ?? "http://localhost:3000").replace(/\/$/, "");
 const API_KEY = process.env["CLEARAGENT_API_KEY"] ?? "";

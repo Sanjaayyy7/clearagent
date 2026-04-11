@@ -1,5 +1,5 @@
 {
-  "name": "@clearagents/mcp-server",
+  "name": "@clearagent/mcp-server",
   "version": "0.2.0",
   "description": "MCP server for ClearAgent AI verification and audit trail",
   "type": "module",
