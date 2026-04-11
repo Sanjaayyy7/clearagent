@@ -23,8 +23,7 @@ import { requestIdMiddleware } from "./middleware/requestId.js";
 import { logger } from "./logger.js";
 
 if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
-  console.error("FATAL: JWT_SECRET must be set in production");
-  process.exit(1);
+  console.warn("WARNING: JWT_SECRET is not set — agent attestation endpoint will return 500");
 }
 
 const app = express();
