@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
 # Universal multi-service Dockerfile.
-# Set the SERVICE build variable in Railway per service:
-#   api (default) | dashboard | landing | mcp-server | sdk
+# Builds ALL packages unconditionally — no SERVICE build variable required.
+# Railway start command per service selects which package to run:
+#   api:        npm start --workspace=packages/api
+#   dashboard:  npm start --workspace=packages/dashboard
+#   landing:    npm start --workspace=packages/landing
+#   mcp-server: npm start --workspace=packages/mcp-server
+#   sdk:        npm start --workspace=packages/sdk
 
 ARG SERVICE=api
 ARG VITE_API_URL=""
@@ -21,14 +26,20 @@ RUN NODE_OPTIONS="--max-old-space-size=1536" npm ci --include-workspace-root
 
 # ─── Stage 2: builder ────────────────────────────────────────
 FROM deps AS builder
-ARG SERVICE=api
 ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 
 COPY tsconfig.base.json ./
 COPY packages/ ./packages/
 
-RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/${SERVICE}
+# Build TypeScript packages (fast)
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/api
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/mcp-server
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/sdk
+
+# Build Vite frontends (memory-intensive — run sequentially)
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/dashboard
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build --workspace=packages/landing
 
 # ─── Stage 3: runner ─────────────────────────────────────────
 FROM node:20-alpine AS runner
