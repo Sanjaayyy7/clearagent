@@ -77,7 +77,7 @@ Submit an AI agent decision for verification. Returns immediately with a `jobId`
 ```json
 {
   "jobId": "V1StGXR8_Z5jdHi6B-myT",
-  "status": "queued"
+  "message": "Verification queued. Poll GET /v1/jobs/:jobId for result."
 }
 ```
 
@@ -100,7 +100,7 @@ curl -X POST http://localhost:3000/v1/events/verify \
 ```json
 {
   "jobId": "V1StGXR8_Z5jdHi6B-myT",
-  "status": "queued"
+  "message": "Verification queued. Poll GET /v1/jobs/:jobId for result."
 }
 ```
 
@@ -120,8 +120,6 @@ Poll the status of an async verification job.
   "jobId": "V1StGXR8_Z5jdHi6B-myT",
   "status": "completed",
   "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "contentHash": "a1b2c3d4e5f6...",
-  "requiresReview": false,
   "createdAt": "2026-04-05T10:00:00.000Z",
   "updatedAt": "2026-04-05T10:00:00.234Z"
 }
@@ -158,7 +156,7 @@ List verification events with filtering and cursor pagination.
 **Response: 200 OK**
 ```json
 {
-  "events": [
+  "data": [
     {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "agentId": "agent-uuid",
@@ -173,8 +171,12 @@ List verification events with filtering and cursor pagination.
       "recordedAt": "2026-04-05T10:00:00.156Z"
     }
   ],
-  "nextCursor": "eyJpZCI6Ii4uLiJ9",
-  "hasMore": true
+  "pagination": {
+    "total": 80,
+    "limit": 10,
+    "hasMore": true,
+    "nextCursor": "eyJyZWNvcmRlZEF0IjoiMjAyNi0wNC0wNVQxMDowMDowMC4xNTZaIiwiaWQiOiIzZmE4NWY2NC01NzE3LTQ1NjItYjNmYy0yYzk2M2Y2NmFmYTYifQ=="
+  }
 }
 ```
 
@@ -197,23 +199,21 @@ Get a single verification event with its linked human reviews.
 **Response: 200 OK**
 ```json
 {
-  "event": {
-    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "agentId": "agent-uuid",
-    "eventType": "settlement_signal",
-    "decision": "flagged",
-    "confidence": 0.7123,
-    "reasoning": "Amount approaches policy limit. Purpose description borderline.",
-    "requiresReview": true,
-    "contentHash": "a1b2c3d4...",
-    "inputPayload": { "amount": 9800, "currency": "USD", ... },
-    "euAiActArticles": ["art-12", "art-14"],
-    "riskIndicators": { "highAmount": true, "borderlinePurpose": true },
-    "occurredAt": "2026-04-05T10:00:00.000Z"
-  },
-  "reviews": [
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "agentId": "agent-uuid",
+  "eventType": "settlement_signal",
+  "decision": "flagged",
+  "confidence": 0.7123,
+  "reasoning": "Amount approaches policy limit. Purpose description borderline.",
+  "requiresReview": true,
+  "contentHash": "a1b2c3d4...",
+  "inputPayload": { "amount": 9800, "currency": "USD" },
+  "euAiActArticles": ["12", "14", "19"],
+  "riskIndicators": { "highAmount": true, "borderlinePurpose": true },
+  "occurredAt": "2026-04-05T10:00:00.000Z",
+  "humanReviews": [
     {
-      "id": "review-uuid",
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa7",
       "action": "override",
       "reviewerEmail": "compliance@example.com",
       "reviewerRole": "compliance_officer",
@@ -293,9 +293,13 @@ Submit a human review of a verification event. Required when `requiresReview = t
 **Response: 201 Created**
 ```json
 {
-  "reviewId": "review-uuid",
+  "id": "review-uuid",
   "eventId": "event-uuid",
   "action": "override",
+  "justification": "Vendor not on approved supplier list per policy FP-2026-Q1. Requires CFO sign-off.",
+  "reviewerId": "jane.smith-001",
+  "reviewerEmail": "jane.smith@example.com",
+  "reviewerRole": "compliance_officer",
   "contentHash": "b2c3d4e5...",
   "reviewCompletedAt": "2026-04-05T10:15:00.000Z"
 }
@@ -368,8 +372,10 @@ Export a compliance package as JSON with SHA-256 file hash. Logged permanently t
 | `from` | ISO 8601 | Export events after this timestamp |
 | `to` | ISO 8601 | Export events before this timestamp |
 | `agent_id` | UUID | Filter by agent |
+| `status` | string | Filter by event status |
 | `authority_name` | string | Regulatory authority name (logged) |
 | `authority_ref` | string | Authority's reference number (logged) |
+| `format` | string | `json` supported now, `xml` reserved for future support |
 
 **Response: 200 OK**
 
@@ -378,9 +384,14 @@ Returns a JSON object with the full compliance export plus metadata:
 {
   "exportId": "export-uuid",
   "generatedAt": "2026-04-05T10:00:00.000Z",
-  "fileHash": "sha256:a1b2c3d4...",
+  "fileHash": "a1b2c3d4...",
   "recordCount": 80,
-  "filters": { "from": "2026-01-01T00:00:00Z" },
+  "filters": {
+    "from": "2026-01-01T00:00:00Z",
+    "authority_name": "BaFin",
+    "authority_ref": "INQ-2026-4421",
+    "format": "json"
+  },
   "events": [ ... ],
   "reviews": [ ... ]
 }
@@ -419,8 +430,7 @@ Register an AI agent under compliance oversight.
 ```json
 {
   "agentId": "agent-uuid",
-  "name": "Procurement Agent",
-  "externalId": "procurement-v2",
+  "apiKey": "ca_live_xxxxxxxxxxxxxxxxxxxxxxxx",
   "status": "active",
   "registeredAt": "2026-04-05T10:00:00.000Z"
 }
@@ -438,6 +448,37 @@ curl -X POST http://localhost:3000/v1/agents/register \
     "modelId": "claude-sonnet-4-6",
     "description": "Handles vendor payment approvals up to $10,000"
   }'
+```
+
+---
+
+## GET /v1/agents
+
+List registered agents.
+
+**Authentication:** Required
+
+**Response: 200 OK**
+```json
+{
+  "agents": [
+    {
+      "id": "agent-uuid",
+      "name": "Procurement Agent",
+      "externalId": "procurement-v2",
+      "status": "active",
+      "modelProvider": "anthropic",
+      "modelId": "claude-sonnet-4-6",
+      "registeredAt": "2026-04-05T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Example:**
+```bash
+curl http://localhost:3000/v1/agents \
+  -H "Authorization: Bearer ca_test_demo_key_clearagent_2026"
 ```
 
 ---
@@ -462,7 +503,7 @@ Update an agent's operational status. Use `suspended` to immediately stop an age
 {
   "agentId": "agent-uuid",
   "status": "suspended",
-  "updatedAt": "2026-04-05T10:00:00.000Z"
+  "name": "Procurement Agent"
 }
 ```
 

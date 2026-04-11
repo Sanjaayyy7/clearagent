@@ -44,11 +44,11 @@ Edit `.env` before running migrations. All variables with defaults are optional 
 | `REDIS_URL` | Yes | `redis://localhost:6379` | Redis connection string |
 | `PORT` | No | `3000` | API server port |
 | `NODE_ENV` | No | `development` | `development` or `production` |
-| `DEMO_API_KEY` | No | `ca_test_demo_key_clearagent_2026` | API key for local testing |
+| `DEMO_API_KEY` | No | `ca_test_demo_key_clearagent_2026` | Local demo key that `npm run seed` inserts into `api_keys` |
 | `LOG_LEVEL` | No | `info` | Pino log level: `trace`, `debug`, `info`, `warn`, `error` |
 | `VITE_API_URL` | No | `http://localhost:3000` | API URL used by the dashboard build |
 
-**Production note:** `DEMO_API_KEY` is a placeholder. Production deployments should implement proper API key issuance via the `api_keys` table — the current auth middleware is demo-grade only.
+**Production note:** the API now validates keys against hashed records in the `api_keys` table. `DEMO_API_KEY` exists only to seed a local development key; production deployments should issue and manage real keys via the register/revoke flow.
 
 ## Database Setup
 
@@ -106,7 +106,7 @@ Or use a managed Redis service with persistence enabled.
 
 ### API key rotation
 
-The `DEMO_API_KEY` must not be used in production. The `api_keys` table supports full API key lifecycle management — generate, label, revoke. Implement key issuance before exposing the API externally.
+The `DEMO_API_KEY` must not be used in production. The `api_keys` table supports hashed key validation, last-used tracking, labeling, and revocation. Production deployments should rotate and revoke keys through the application lifecycle rather than keeping a shared static key.
 
 ```sql
 -- Revoke a key

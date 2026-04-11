@@ -26,6 +26,21 @@ function useInView(threshold = 0.1): [React.RefObject<HTMLDivElement>, boolean] 
   return [ref, visible];
 }
 
+function useLiveEventCount(fallback = 80): number {
+  const [count, setCount] = useState(fallback);
+  useEffect(() => {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL || "";
+    if (!apiUrl) return;
+    fetch(`${apiUrl}/v1/audit/integrity`, {
+      headers: { Authorization: `Bearer ${(import.meta as any).env?.VITE_API_KEY || "ca_test_demo_key_clearagent_2026"}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.totalEvents != null) setCount(data.totalEvents); })
+      .catch(() => {/* graceful fallback */});
+  }, []);
+  return count;
+}
+
 function useCounter(target: number, duration: number, active: boolean): number {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -568,7 +583,8 @@ function ComplianceStats() {
 /* ── Live Metrics ────────────────────────────────────────── */
 function LiveMetrics() {
   const [ref, visible] = useInView();
-  const events = useCounter(80, 1400, visible);
+  const liveCount = useLiveEventCount(80);
+  const events = useCounter(liveCount, 1400, visible);
   const [time, setTime] = useState(() => new Date().toTimeString().slice(0, 8));
   useEffect(() => {
     const id = setInterval(() => setTime(new Date().toTimeString().slice(0, 8)), 1000);

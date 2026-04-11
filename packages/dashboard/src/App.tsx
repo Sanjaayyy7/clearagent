@@ -6,6 +6,7 @@ import IntegrityReport from "./pages/IntegrityReport.tsx";
 import AgentManagement from "./pages/AgentManagement.tsx";
 import EscalatedReviews from "./pages/EscalatedReviews.tsx";
 import { CustomCursor, DashboardNav, PageShell } from "./theme.tsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 
 function AppFrame() {
   useEffect(() => {
@@ -17,11 +18,11 @@ function AppFrame() {
       <CustomCursor />
       <DashboardNav />
       <Routes>
-        <Route path="/" element={<LiveFeed />} />
-        <Route path="/events/:id" element={<EventDetail />} />
-        <Route path="/integrity" element={<IntegrityReport />} />
-        <Route path="/agents" element={<AgentManagement />} />
-        <Route path="/escalated" element={<EscalatedReviews />} />
+        <Route path="/" element={<ErrorBoundary><LiveFeed /></ErrorBoundary>} />
+        <Route path="/events/:id" element={<ErrorBoundary><EventDetail /></ErrorBoundary>} />
+        <Route path="/integrity" element={<ErrorBoundary><IntegrityReport /></ErrorBoundary>} />
+        <Route path="/agents" element={<ErrorBoundary><AgentManagement /></ErrorBoundary>} />
+        <Route path="/escalated" element={<ErrorBoundary><EscalatedReviews /></ErrorBoundary>} />
       </Routes>
       <footer className="dashboard-footer">
         <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 48px", width: "100%" }}>

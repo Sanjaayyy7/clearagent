@@ -1,22 +1,15 @@
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getEvent, type VerificationEvent, type HumanReview } from "../lib/api.ts";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { getEvent, type HumanReview, type VerificationEvent } from "../lib/api.ts";
 import ReviewForm from "../components/ReviewForm.tsx";
+import { BODY, HEADING, SectionLabel, contentWidth, ErrorState, LoadingState } from "../theme.tsx";
 
-function Badge({ label, color }: { label: string; color: string }) {
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}>
-      {label}
-    </span>
-  );
+function badgeTone(decision: string) {
+  if (decision === "approved") return "dashboard-badge dashboard-badge-success";
+  if (decision === "flagged") return "dashboard-badge dashboard-badge-warning";
+  if (decision === "rejected" || decision === "failed") return "dashboard-badge dashboard-badge-danger";
+  return "dashboard-badge dashboard-badge-neutral";
 }
-
-const decisionColors: Record<string, string> = {
-  approved: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  flagged: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  rejected: "bg-red-500/15 text-red-400 border-red-500/30",
-  pending: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-};
 
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,146 +27,140 @@ export default function EventDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full text-brand-muted">Loading event...</div>;
+    return <LoadingState label="Loading verification event..." />;
   }
 
   if (error || !event) {
     return (
-      <div className="text-center mt-20">
-        <p className="text-red-400 mb-4">{error || "Event not found"}</p>
-        <button onClick={() => navigate("/")} className="text-brand-accent text-sm hover:underline">
-          Back to Live Feed
-        </button>
-      </div>
+      <ErrorState
+        label={error || "Event not found"}
+        action={
+          <button type="button" onClick={() => navigate("/")} className="dashboard-text-link" style={{ marginTop: 12 }}>
+            Back to Live Feed
+          </button>
+        }
+      />
     );
   }
 
-  const conf = event.confidence !== null ? (Number(event.confidence) * 100).toFixed(1) + "%" : "n/a";
+  const confidence = event.confidence !== null ? `${(Number(event.confidence) * 100).toFixed(1)}%` : "n/a";
   const needsReview = event.requiresReview && event.humanReviews.length === 0;
 
   return (
-    <div className="max-w-4xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-2">
-        <button onClick={() => navigate("/")} className="text-brand-muted hover:text-brand-text text-sm">
-          ← Back
+    <section className="dashboard-page">
+      <div style={contentWidth()}>
+        <button type="button" onClick={() => navigate("/")} className="dashboard-text-link" style={{ marginBottom: 20 }}>
+          ← Back to Live Feed
         </button>
-      </div>
 
-      <div className="bg-brand-surface border border-brand-border rounded-xl p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-brand-text mb-1">Verification Event</h2>
-            <code className="text-xs text-brand-muted font-mono">{event.id}</code>
+        <div className="dashboard-card dashboard-hero-card">
+          <div className="dashboard-page-intro dashboard-page-intro-split">
+            <div>
+              <SectionLabel>Event detail</SectionLabel>
+              <div style={{ ...HEADING, fontSize: "clamp(38px, 5vw, 56px)", marginBottom: 14 }}>Verification evidence.</div>
+              <p style={{ ...BODY, maxWidth: 760 }}>
+                A full record of the model decision, input and output payloads, hash-chain linkage, and oversight state
+                rendered in the same product language as the landing page.
+              </p>
+            </div>
+            <span className={badgeTone(event.decision)}>{event.decision}</span>
           </div>
-          <Badge
-            label={event.decision.charAt(0).toUpperCase() + event.decision.slice(1)}
-            color={decisionColors[event.decision] || "bg-gray-500/15 text-gray-400 border-gray-500/30"}
-          />
-        </div>
-        <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
-          <div>
-            <p className="text-brand-muted text-xs uppercase tracking-wide">Confidence</p>
-            <p className={`font-mono mt-0.5 ${
-              Number(event.confidence) >= 0.85 ? "text-emerald-400" :
-              Number(event.confidence) >= 0.5 ? "text-amber-400" : "text-red-400"
-            }`}>{conf}</p>
-          </div>
-          <div>
-            <p className="text-brand-muted text-xs uppercase tracking-wide">Event Type</p>
-            <p className="mt-0.5">{event.eventType}</p>
-          </div>
-          <div>
-            <p className="text-brand-muted text-xs uppercase tracking-wide">Occurred At</p>
-            <p className="mt-0.5 text-xs">{new Date(event.occurredAt).toLocaleString()}</p>
-          </div>
-        </div>
-        {event.requiresReview && (
-          <div className="mt-3 flex items-center gap-2">
-            <span className="w-2 h-2 bg-amber-400 rounded-full" />
-            <span className="text-amber-400 text-xs">Human review required (EU AI Act Art. 14)</span>
-          </div>
-        )}
-      </div>
 
-      {/* Input / Output */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide mb-2">Input Payload</p>
-          <pre className="text-xs font-mono text-brand-text whitespace-pre-wrap break-all overflow-auto max-h-48">
-            {JSON.stringify(event.inputPayload, null, 2)}
-          </pre>
-        </div>
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide mb-2">Output Payload</p>
-          <pre className="text-xs font-mono text-brand-text whitespace-pre-wrap break-all overflow-auto max-h-48">
-            {event.outputPayload ? JSON.stringify(event.outputPayload, null, 2) : "—"}
-          </pre>
-        </div>
-      </div>
-
-      {/* Hash chain */}
-      <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-        <p className="text-xs text-brand-muted uppercase tracking-wide mb-3">Hash Chain (Art. 12)</p>
-        <div className="space-y-2">
-          <div>
-            <p className="text-xs text-brand-muted">Content Hash</p>
-            <code className="text-xs font-mono text-emerald-400 break-all">{event.contentHash}</code>
+          <div className="dashboard-grid dashboard-grid-three">
+            <div>
+              <p className="dashboard-card-label">Confidence</p>
+              <p className="dashboard-metric-value" style={{ fontSize: "clamp(28px, 3vw, 40px)" }}>
+                {confidence}
+              </p>
+            </div>
+            <div>
+              <p className="dashboard-card-label">Event Type</p>
+              <p className="dashboard-primary-cell" style={{ marginTop: 10 }}>{event.eventType}</p>
+            </div>
+            <div>
+              <p className="dashboard-card-label">Occurred At</p>
+              <p className="dashboard-primary-cell" style={{ marginTop: 10 }}>{new Date(event.occurredAt).toLocaleString()}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-brand-muted">Previous Hash</p>
-            <code className="text-xs font-mono text-brand-muted break-all">{event.prevHash ?? "null (first event)"}</code>
+
+          {event.requiresReview ? (
+            <div className="dashboard-inline-alert" style={{ marginTop: 24 }}>
+              <span className="dashboard-live-dot" />
+              <span>Human review required under EU AI Act Article 14.</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="dashboard-grid dashboard-grid-two dashboard-detail-grid">
+          <div className="dashboard-card">
+            <SectionLabel>Input payload</SectionLabel>
+            <pre className="dashboard-json-block">{JSON.stringify(event.inputPayload, null, 2)}</pre>
+          </div>
+          <div className="dashboard-card">
+            <SectionLabel>Output payload</SectionLabel>
+            <pre className="dashboard-json-block">
+              {event.outputPayload ? JSON.stringify(event.outputPayload, null, 2) : "—"}
+            </pre>
           </div>
         </div>
-      </div>
 
-      {/* Reasoning */}
-      {event.reasoning && (
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide mb-2">Reasoning</p>
-          <p className="text-sm text-brand-text">{event.reasoning}</p>
-        </div>
-      )}
+        <div className="dashboard-grid dashboard-grid-two dashboard-detail-grid">
+          <div className="dashboard-card">
+            <SectionLabel>Hash chain</SectionLabel>
+            <div className="dashboard-code-block">
+              <p className="dashboard-card-label">Content Hash</p>
+              <code className="dashboard-hash dashboard-hash-full">{event.contentHash}</code>
+            </div>
+            <div className="dashboard-code-block">
+              <p className="dashboard-card-label">Previous Hash</p>
+              <code className="dashboard-hash dashboard-hash-full">{event.prevHash ?? "null (first event)"}</code>
+            </div>
+          </div>
 
-      {/* EU AI Act articles */}
-      {event.euAiActArticles && event.euAiActArticles.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-brand-muted">EU AI Act:</span>
-          {event.euAiActArticles.map((art) => (
-            <Badge key={art} label={art} color="bg-brand-accent/10 text-brand-accent border-brand-accent/30" />
-          ))}
-        </div>
-      )}
-
-      {/* Human reviews */}
-      {event.humanReviews.length > 0 && (
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide mb-3">Human Reviews</p>
-          <div className="space-y-3">
-            {event.humanReviews.map((review) => (
-              <div key={review.id} className="border border-brand-border rounded-lg p-3 text-sm">
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`font-medium capitalize ${
-                    review.action === "approve" ? "text-emerald-400" :
-                    review.action === "reject" ? "text-red-400" : "text-amber-400"
-                  }`}>{review.action}</span>
-                  <span className="text-xs text-brand-muted">{new Date(review.reviewedAt).toLocaleString()}</span>
-                </div>
-                <p className="text-brand-text text-xs">{review.justification}</p>
-                <p className="text-brand-muted text-xs mt-1">
-                  {review.reviewerRole} · {review.reviewerEmail}
-                </p>
+          <div className="dashboard-card">
+            <SectionLabel>Decision context</SectionLabel>
+            {event.reasoning ? <p style={{ ...BODY, fontSize: 15, marginBottom: 18 }}>{event.reasoning}</p> : null}
+            {event.euAiActArticles && event.euAiActArticles.length > 0 ? (
+              <div className="dashboard-pill-row">
+                {event.euAiActArticles.map((article) => (
+                  <span key={article} className="dashboard-badge dashboard-badge-neutral">
+                    {article}
+                  </span>
+                ))}
               </div>
-            ))}
+            ) : (
+              <p className="dashboard-card-copy">No EU AI Act article labels attached to this event.</p>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Review form */}
-      {needsReview && <ReviewForm eventId={event.id} onSuccess={load} />}
-    </div>
+        {event.humanReviews.length > 0 ? (
+          <div className="dashboard-card">
+            <SectionLabel>Human reviews</SectionLabel>
+            <div className="dashboard-review-stack">
+              {event.humanReviews.map((review) => (
+                <div key={review.id} className="dashboard-review-item">
+                  <div className="dashboard-page-intro-split" style={{ marginBottom: 10 }}>
+                    <span className={badgeTone(review.action)}>{review.action}</span>
+                    <span className="dashboard-secondary-cell">{new Date(review.reviewCompletedAt).toLocaleString()}</span>
+                  </div>
+                  <p className="dashboard-primary-cell">{review.justification}</p>
+                  <p className="dashboard-card-copy" style={{ marginTop: 8 }}>
+                    {review.reviewerRole} · {review.reviewerEmail}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {needsReview ? <ReviewForm eventId={event.id} onSuccess={load} /> : null}
+      </div>
+    </section>
   );
 }

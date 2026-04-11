@@ -12,6 +12,9 @@ import { agentsRouter } from "./routes/agents.js";
 import { auditRouter } from "./routes/audit.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { startWorker, QUEUE_NAME } from "./workers/verify.worker.js";
+import { startSlaWorker } from "./workers/sla.worker.js";
+import { startRetentionWorker, scheduleRetentionPurge } from "./workers/retention.worker.js";
+import { policiesRouter } from "./routes/policies.js";
 import { logger } from "./logger.js";
 
 const app = express();
@@ -39,6 +42,26 @@ const limiter = rateLimit({
   message: { error: { code: "rate_limit_exceeded", message: "Too many requests, please retry after a minute" } },
 });
 app.use(limiter);
+
+// Per-route rate limits (Story 1.2 — tighter caps on write endpoints)
+const isTest = process.env.NODE_ENV === "test";
+const verifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isTest ? 10000 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "rate_limit_exceeded", message: "Too many verify requests, please retry after a minute" } },
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isTest ? 10000 : 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "rate_limit_exceeded", message: "Too many register requests, please retry after a minute" } },
+});
+app.use("/v1/events/verify", verifyLimiter);
+app.use("/v1/agents/register", registerLimiter);
+
 const _corsOrigins = process.env.CORS_ORIGINS;
 app.use(cors({
   origin: _corsOrigins === "*" || !_corsOrigins
@@ -70,6 +93,7 @@ app.use("/v1/jobs", authMiddleware, jobsRouter);
 app.use("/v1/reviews", authMiddleware, reviewsRouter);
 app.use("/v1/agents", authMiddleware, agentsRouter);
 app.use("/v1/audit", authMiddleware, auditRouter);
+app.use("/v1/policies", authMiddleware, policiesRouter);
 
 // ─── Error handler ───────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -84,16 +108,23 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 // ─── Start ───────────────────────────────────────────────────
 const worker = startWorker(redisConnection);
+const slaWorker = startSlaWorker(redisConnection);
+const retentionWorker = startRetentionWorker(redisConnection);
+scheduleRetentionPurge(redisConnection).catch((err) => logger.warn({ err }, "Failed to schedule retention purge"));
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, "ClearAgent API server running");
   logger.info("Verification worker started (concurrency: 5)");
+  logger.info("SLA enforcement worker started (Art. 14)");
+  logger.info("Retention purge worker started (daily 02:00 UTC)");
 });
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   logger.info("Shutting down...");
   await worker.close();
+  await slaWorker.close();
+  await retentionWorker.close();
   await verificationQueue.close();
   await redisConnection.quit();
   process.exit(0);

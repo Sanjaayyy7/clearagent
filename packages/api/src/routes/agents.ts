@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { db, schema } from "../db/index.js";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { validate } from "../middleware/validate.js";
 import { logger } from "../logger.js";
 import { nanoid } from "nanoid";
@@ -21,11 +21,59 @@ const updateStatusSchema = z.object({
   status: z.enum(["active", "suspended", "flagged"]),
 });
 
-// GET /v1/agents — list all registered agents
-router.get("/", async (_req, res, next) => {
+// GET /v1/agents — list registered agents with cursor pagination
+router.get("/", async (req, res, next) => {
   try {
-    const agents = await db.select().from(schema.agents).orderBy(schema.agents.registeredAt);
-    res.json({ agents });
+    const auth = (req as any).auth;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const { cursor } = req.query;
+
+    const conditions = [eq(schema.agents.orgId, auth.orgId)];
+
+    // Cursor pagination: cursor is base64-encoded JSON { registeredAt, id }
+    if (cursor) {
+      const decoded = JSON.parse(Buffer.from(cursor as string, "base64").toString("utf8"));
+      conditions.push(
+        or(
+          lt(schema.agents.registeredAt, new Date(decoded.registeredAt)),
+          and(
+            eq(schema.agents.registeredAt, new Date(decoded.registeredAt)),
+            lt(schema.agents.id, decoded.id)
+          )
+        )!
+      );
+    }
+
+    const where = and(...conditions);
+
+    const agents = await db
+      .select()
+      .from(schema.agents)
+      .where(where)
+      .orderBy(desc(schema.agents.registeredAt), desc(schema.agents.id))
+      .limit(limit);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, auth.orgId)));
+
+    const nextCursor =
+      agents.length === limit
+        ? Buffer.from(
+            JSON.stringify({ registeredAt: agents[agents.length - 1].registeredAt, id: agents[agents.length - 1].id })
+          ).toString("base64")
+        : null;
+
+    res.json({
+      agents,
+      pagination: {
+        total: count,
+        limit,
+        hasMore: nextCursor !== null,
+        nextCursor,
+      },
+    });
   } catch (err) {
     next(err);
   }

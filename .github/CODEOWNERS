@@ -1,0 +1,44 @@
+# ClearAgent CODEOWNERS
+# Each line maps a path pattern to the team/dept responsible for review.
+# GitHub requires at least one CODEOWNER approval before merge.
+# Format: <pattern>  <owner(s)>
+# Dept aliases are placeholders — replace with real GitHub handles.
+
+# ── Default (all files not matched below) ─────────────────────
+*                               @clearagent/core
+
+# ── Dept 1: Core Platform Engineering ─────────────────────────
+/packages/api/src/routes/       @clearagent/dept1-platform
+/packages/api/src/workers/      @clearagent/dept1-platform
+/packages/api/src/middleware/   @clearagent/dept1-platform
+/packages/api/src/db/           @clearagent/dept1-platform
+
+# ── Dept 2: Trust & Cryptography ──────────────────────────────
+/packages/api/src/services/hashChain.ts  @clearagent/dept2-trust
+/packages/api/src/db/migrations/         @clearagent/dept2-trust
+/packages/api/src/__tests__/             @clearagent/dept2-trust
+
+# ── Dept 3: Frontend & Dashboard ──────────────────────────────
+/packages/dashboard/            @clearagent/dept3-frontend
+/packages/landing/              @clearagent/dept3-frontend
+
+# ── Dept 4: Developer Experience ──────────────────────────────
+/packages/sdk/                  @clearagent/dept4-dx
+/packages/sdk-python/           @clearagent/dept4-dx
+/packages/mcp-server/           @clearagent/dept4-dx
+/docs/                          @clearagent/dept4-dx
+/scripts/                       @clearagent/dept4-dx
+
+# ── Dept 5: Compliance & Legal ────────────────────────────────
+/packages/api/src/services/oversight.ts  @clearagent/dept5-compliance
+/docs/eu-ai-act-guide.md                 @clearagent/dept5-compliance
+
+# ── Dept 8: DevOps & Infrastructure ───────────────────────────
+/.github/                       @clearagent/dept8-devops
+/docker-compose.yml             @clearagent/dept8-devops
+/packages/api/Dockerfile        @clearagent/dept8-devops
+/packages/api/.dockerignore     @clearagent/dept8-devops
+
+# ── Compliance-critical files (any change needs dept2 + dept5) ─
+/packages/api/src/db/migrate.ts          @clearagent/dept2-trust @clearagent/dept5-compliance
+/packages/api/src/db/schema.ts           @clearagent/dept2-trust @clearagent/dept1-platform

@@ -1,5 +1,6 @@
-import { Worker, type Job } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import { Redis as IORedis } from "ioredis";
+import { SLA_QUEUE_NAME, type SlaJobData } from "./sla.worker.js";
 import { db, schema } from "../db/index.js";
 import { eq, desc, sql, and, asc } from "drizzle-orm";
 import { verifyTransaction, type TransactionInput } from "../verification/transaction.js";
@@ -8,6 +9,9 @@ import { evaluateOversightPolicies, type OversightPolicy } from "../services/ove
 import { logger } from "../logger.js";
 
 export const QUEUE_NAME = "verification";
+
+// Module-level SLA queue — initialised in startWorker before any job runs
+let slaQueue: Queue<SlaJobData> | null = null;
 
 export interface VerificationJobData {
   jobId: string;
@@ -138,6 +142,26 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
     // Mark job completed
     await db.update(schema.jobs).set({ status: "completed", eventId: event.id, updatedAt: new Date() }).where(eq(schema.jobs.id, data.jobId));
 
+    // Enqueue SLA enforcement job if review required (Art. 14)
+    if (oversight.requiresReview && slaQueue) {
+      // Find the slaSeconds from the matching policy (default 3600s = 1 hour)
+      const matchingPolicy = (activePolicies as Array<{ name: string; slaSeconds?: number | null }>).find((p) => {
+        const cond = p as unknown as { triggerConditions?: { confidence_below?: number; decision?: string } };
+        const tc = cond?.triggerConditions;
+        if (!tc) return false;
+        if (typeof tc.confidence_below === "number" && result.confidence !== null && result.confidence < tc.confidence_below) return true;
+        if (typeof tc.decision === "string" && result.decision === tc.decision) return true;
+        return false;
+      });
+      const slaSeconds = (matchingPolicy as any)?.slaSeconds ?? 3600;
+      const policyName = (matchingPolicy as any)?.name ?? "default";
+      void slaQueue.add(
+        "escalate",
+        { eventId: event.id, orgId: data.orgId, policyName, slaSeconds },
+        { delay: slaSeconds * 1000, attempts: 3, backoff: { type: "exponential", delay: 5000 } }
+      ).catch((err) => log.warn({ err }, "Failed to enqueue SLA job — non-critical"));
+    }
+
     // Write Merkle checkpoint (Art. 12 + 19 — integrity snapshot after each event)
     // Best-effort: failure here does not fail the verification job
     void writeIntegrityCheckpoint(data.orgId, data.jobId).catch((err) => {
@@ -153,6 +177,9 @@ async function processVerification(job: Job<VerificationJobData>): Promise<void>
 }
 
 export function startWorker(redisConnection: IORedis): Worker<VerificationJobData> {
+  // Initialise SLA queue so processVerification can enqueue delayed escalation jobs
+  slaQueue = new Queue<SlaJobData>(SLA_QUEUE_NAME, { connection: redisConnection });
+
   const worker = new Worker<VerificationJobData>(QUEUE_NAME, processVerification, {
     connection: redisConnection,
     concurrency: 5,

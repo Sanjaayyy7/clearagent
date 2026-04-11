@@ -1,4 +1,5 @@
 import "dotenv/config";
+import bcrypt from "bcrypt";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./src/db/schema.js";
@@ -155,6 +156,18 @@ async function seed() {
   console.log(`  Agent 1 (active):    ${procurementAgent.name}`);
   console.log(`  Agent 2 (active):    ${riskAgent.name}`);
   console.log(`  Agent 3 (suspended): ${legacyAgent.name}`);
+
+  const demoApiKey = process.env.DEMO_API_KEY || "ca_test_demo_key_clearagent_2026";
+  await db.insert(schema.apiKeys).values({
+    orgId: org.id,
+    agentId: procurementAgent.id,
+    keyHash: await bcrypt.hash(demoApiKey, 10),
+    keyPrefix: demoApiKey.slice(0, 12),
+    lastFour: demoApiKey.slice(-4),
+    label: "Seeded demo API key",
+    isTest: true,
+  });
+  console.log(`  Demo API key seeded: ${demoApiKey.slice(0, 12)}…${demoApiKey.slice(-4)}`);
 
   // 3. Oversight policy
   const [policy] = await db.insert(schema.oversightPolicies).values({

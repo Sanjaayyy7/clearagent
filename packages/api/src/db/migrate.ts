@@ -16,12 +16,18 @@ async function runMigrations() {
   // Create immutability enforcement for audit tables
   console.log("Setting up immutability enforcement...");
 
-  // verification_events: allow ONE status transition (pending → final), block all other updates and all deletes
+  // verification_events: block all updates EXCEPT retention anonymization (GDPR Art. 17 / EU AI Act Art. 19)
   await client`
     CREATE OR REPLACE FUNCTION enforce_verification_immutability()
     RETURNS trigger AS $$
     BEGIN
-      -- All updates blocked — events are inserted complete, never updated (EU AI Act Art. 12)
+      -- Allow retention anonymization: only permits updates that replace payloads with { "anonymized": true }
+      -- when the event's retention period has expired. All other updates are blocked (EU AI Act Art. 12).
+      IF NEW.input_payload::text = '{"anonymized":true}'
+         AND (NEW.output_payload IS NULL OR NEW.output_payload::text = '{"anonymized":true}')
+         AND OLD.retention_expires_at < NOW() THEN
+        RETURN NEW;
+      END IF;
       RAISE EXCEPTION 'verification_events is append-only: all updates blocked (EU AI Act Art. 12)';
     END;
     $$ LANGUAGE plpgsql;

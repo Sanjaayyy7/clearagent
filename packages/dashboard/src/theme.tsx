@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { listEvents } from "./lib/api.ts";
 
 export const FS = { fontFamily: "var(--font-sans)" } as const;
 export const HEADING = {
@@ -90,7 +91,7 @@ export function SectionHeading({
   );
 }
 
-function DashboardNavLink({ to, label }: { to: string; label: string }) {
+function DashboardNavLink({ to, label, badge }: { to: string; label: string; badge?: number }) {
   const location = useLocation();
   const active = to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
 
@@ -105,9 +106,31 @@ function DashboardNavLink({ to, label }: { to: string; label: string }) {
         color: active ? "#000000" : "#555555",
         textDecoration: "none",
         transition: "color 0.15s",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
       }}
     >
       {label}
+      {badge != null && badge > 0 && (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9999,
+            background: "#dc2626",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "0 5px",
+          }}
+        >
+          {badge}
+        </span>
+      )}
     </NavLink>
   );
 }
@@ -115,6 +138,7 @@ function DashboardNavLink({ to, label }: { to: string; label: string }) {
 export function DashboardNav() {
   const [floating, setFloating] = useState(false);
   const [open, setOpen] = useState(false);
+  const [overdueCount, setOverdueCount] = useState(0);
   const location = useLocation();
 
   useEffect(() => {
@@ -127,17 +151,56 @@ export function DashboardNav() {
     setOpen(false);
   }, [location.pathname]);
 
+  // Poll for overdue reviews every 60s to drive the red badge
+  useEffect(() => {
+    const SLA_MS = 3600 * 1000;
+    function check() {
+      listEvents({ limit: 100 })
+        .then((res) => {
+          const now = Date.now();
+          const overdue = res.data.filter(
+            (e) => e.requiresReview && now - new Date(e.occurredAt).getTime() > SLA_MS
+          );
+          setOverdueCount(overdue.length);
+        })
+        .catch(() => {/* non-critical */});
+    }
+    check();
+    const id = setInterval(check, 60000);
+    return () => clearInterval(id);
+  }, []);
+
   const links = useMemo(
     () => [
       { to: "/", label: "Live Feed" },
       { to: "/integrity", label: "Integrity" },
       { to: "/agents", label: "Agents" },
-      { to: "/escalated", label: "Escalated" },
+      { to: "/escalated", label: "Escalated", badge: overdueCount },
     ],
-    []
+    [overdueCount]
   );
 
   return (
+    <>
+    {overdueCount > 0 && (
+      <div
+        style={{
+          background: "#dc2626",
+          color: "#fff",
+          textAlign: "center",
+          fontSize: 13,
+          fontWeight: 600,
+          fontFamily: "var(--font-sans)",
+          padding: "7px 16px",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {overdueCount} review{overdueCount !== 1 ? "s" : ""} overdue — EU AI Act Art. 14 SLA breach.{" "}
+        <Link to="/escalated" style={{ color: "#fff", textDecoration: "underline" }}>
+          Review now →
+        </Link>
+      </div>
+    )}
     <nav className={`nav-base${floating ? " nav-floating" : ""}`}>
       <div style={{ ...contentWidth(), height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link to="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none" }}>
@@ -180,7 +243,7 @@ export function DashboardNav() {
 
         <div className="hidden md:flex" style={{ gap: 32, alignItems: "center" }}>
           {links.map((link) => (
-            <DashboardNavLink key={link.to} to={link.to} label={link.label} />
+            <DashboardNavLink key={link.to} to={link.to} label={link.label} badge={(link as any).badge} />
           ))}
         </div>
 
@@ -245,7 +308,7 @@ export function DashboardNav() {
           }}
         >
           {links.map((link) => (
-            <DashboardNavLink key={link.to} to={link.to} label={link.label} />
+            <DashboardNavLink key={link.to} to={link.to} label={link.label} badge={(link as any).badge} />
           ))}
           <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
             <a
@@ -273,6 +336,7 @@ export function DashboardNav() {
         </div>
       )}
     </nav>
+    </>
   );
 }
 

@@ -3,6 +3,7 @@ import { db, schema } from "../db/index.js";
 import { asc, desc, and, eq, gte, inArray, lte } from "drizzle-orm";
 import { computeContentHash, computeMerkleRoot, sha256 } from "../services/hashChain.js";
 import { logger } from "../logger.js";
+import { XMLBuilder } from "fast-xml-parser";
 
 const router = Router();
 
@@ -84,11 +85,11 @@ router.get("/export", async (req, res, next) => {
     const authorityRef = typeof req.query.authority_ref === "string" ? req.query.authority_ref : undefined;
     const format = typeof req.query.format === "string" ? req.query.format : "json";
 
-    if (format !== "json") {
+    if (format !== "json" && format !== "xml") {
       res.status(501).json({
         error: {
           code: "format_not_supported",
-          message: `Export format "${format}" is not implemented yet`,
+          message: `Export format "${format}" is not supported. Use "json" or "xml".`,
         },
       });
       return;
@@ -174,12 +175,67 @@ router.get("/export", async (req, res, next) => {
       completedAt: new Date(),
     });
 
-    logger.info({ recordCount: events.length, fileHash }, "Audit export completed");
+    logger.info({ recordCount: events.length, fileHash, format }, "Audit export completed");
 
-    res.json({
-      ...exportBody,
-      fileHash,
-    });
+    if (format === "xml") {
+      // EU regulator XML format (Art. 19)
+      const xmlBuilder = new XMLBuilder({
+        ignoreAttributes: false,
+        format: true,
+        indentBy: "  ",
+        arrayNodeName: "item",
+      });
+      const xmlPayload = {
+        AuditExport: {
+          ExportMeta: {
+            ExportId: exportBody.exportId,
+            GeneratedAt: exportBody.generatedAt,
+            PrevExportHash: exportBody.prevExportHash ?? "",
+            FileHash: fileHash,
+            RecordCount: exportBody.recordCount,
+            AuthorityName: authorityName ?? "",
+            AuthorityRef: authorityRef ?? "",
+          },
+          Events: {
+            Event: exportBody.events.map((e) => ({
+              Id: e.id,
+              AgentId: e.agentId ?? "",
+              EventType: e.eventType,
+              EventCategory: e.eventCategory,
+              Decision: e.decision,
+              Confidence: e.confidence ?? "",
+              Status: e.status,
+              RequiresReview: e.requiresReview,
+              ContentHash: e.contentHash,
+              PrevHash: e.prevHash ?? "",
+              OccurredAt: e.occurredAt,
+              EuAiActArticles: (e.euAiActArticles ?? []).join(","),
+            })),
+          },
+          Reviews: {
+            Review: exportBody.reviews.map((r) => ({
+              Id: r.id,
+              EventId: r.eventId,
+              ReviewerId: r.reviewerId,
+              ReviewerRole: r.reviewerRole,
+              Action: r.action,
+              OriginalDecision: r.originalDecision,
+              Justification: r.justification,
+              ContentHash: r.contentHash,
+              ReviewCompletedAt: r.reviewCompletedAt,
+            })),
+          },
+        },
+      };
+      const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n` + xmlBuilder.build(xmlPayload);
+      res.set("Content-Type", "application/xml; charset=utf-8");
+      res.send(xmlContent);
+    } else {
+      res.json({
+        ...exportBody,
+        fileHash,
+      });
+    }
   } catch (err) {
     next(err);
   }

@@ -81,8 +81,8 @@ async function main(): Promise<void> {
 
   // 6. List recent events
   console.log("6. Listing recent events...");
-  const { events } = await ca.events.list({ limit: 5 });
-  for (const event of events) {
+  const { data } = await ca.events.list({ limit: 5 });
+  for (const event of data) {
     const conf = event.confidence !== null ? (Number(event.confidence) * 100).toFixed(1) + "%" : "n/a";
     console.log(`   [${event.decision.padEnd(8)}] conf=${conf.padStart(6)} hash=${event.contentHash.slice(0, 16)}...`);
   }

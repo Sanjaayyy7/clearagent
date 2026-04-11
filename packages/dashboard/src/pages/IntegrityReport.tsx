@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getAuditIntegrity, getAuditExport, type AuditIntegrity } from "../lib/api.ts";
+import { getAuditExport, getAuditIntegrity, type AuditIntegrity } from "../lib/api.ts";
+import { BODY, HEADING, SectionHeading, SectionLabel, contentWidth, ErrorState, LoadingState } from "../theme.tsx";
+
+function integrityTone(valid: boolean) {
+  return valid ? "dashboard-badge dashboard-badge-success" : "dashboard-badge dashboard-badge-danger";
+}
 
 export default function IntegrityReport() {
   const [data, setData] = useState<AuditIntegrity | null>(null);
@@ -17,13 +22,16 @@ export default function IntegrityReport() {
   async function handleExport() {
     setExporting(true);
     try {
-      const result = await getAuditExport({ authorityName: "ClearAgent Dashboard", authorityRef: `EXPORT-${Date.now()}` });
+      const result = await getAuditExport({
+        authorityName: "ClearAgent Dashboard",
+        authorityRef: `EXPORT-${Date.now()}`,
+      });
       const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `clearagent-audit-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `clearagent-audit-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
       URL.revokeObjectURL(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Export failed");
@@ -33,99 +41,117 @@ export default function IntegrityReport() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full text-brand-muted">Loading integrity data...</div>;
+    return <LoadingState label="Loading audit-chain integrity evidence..." />;
   }
 
   if (error || !data) {
-    return <div className="text-center mt-20 text-red-400">{error || "Failed to load"}</div>;
+    return <ErrorState label={error || "Failed to load integrity data"} />;
   }
 
   const complianceItems = [
-    { label: "Art. 12 — Automatic logging", status: true, detail: "Append-only PostgreSQL + SHA-256 hash chain" },
-    { label: "Art. 12 — Tamper evidence", status: data.validChain, detail: data.validChain ? "Hash chain intact" : `Chain broken at ${data.brokenAt}` },
-    { label: "Art. 14 — Human oversight", status: true, detail: "Review workflow with mandatory justification" },
-    { label: "Art. 19 — Record keeping", status: true, detail: "JSON export with SHA-256 file hash" },
-    { label: "Art. 19 — Retention enforcement", status: false, detail: "retention_expires_at set — auto-purge not yet implemented" },
+    {
+      label: "Art. 12 — Automatic logging",
+      status: true,
+      detail: "Append-only PostgreSQL ledger plus SHA-256 content hashing and previous-hash linkage.",
+    },
+    {
+      label: "Art. 12 — Tamper evidence",
+      status: data.validChain,
+      detail: data.validChain ? "Hash chain intact and Merkle root available." : `Chain broken at ${data.brokenAt}`,
+    },
+    {
+      label: "Art. 14 — Human oversight",
+      status: true,
+      detail: "Human review workflow requires justification and permanent review records.",
+    },
+    {
+      label: "Art. 19 — Record keeping",
+      status: true,
+      detail: "Regulator-ready JSON export with deterministic export hash.",
+    },
+    {
+      label: "Art. 19 — Retention enforcement",
+      status: false,
+      detail: "Retention timestamps exist; automated purge enforcement is still pending.",
+    },
   ];
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h2 className="text-xl font-bold">Integrity Report</h2>
-        <p className="text-sm text-brand-muted mt-0.5">
-          Last checked: {new Date(data.checkedAt).toLocaleString()}
-        </p>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide">Chain Status</p>
-          <div className="mt-1">
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
-              data.validChain
-                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                : "bg-red-500/15 text-red-400 border-red-500/30"
-            }`}>
-              {data.validChain ? "Intact" : "BROKEN"}
-            </span>
+    <>
+      <section className="dashboard-page">
+        <div style={contentWidth()}>
+          <div className="dashboard-page-intro">
+            <SectionLabel>Integrity</SectionLabel>
+            <SectionHeading line1="Audit chain" line2="evidence, intact" />
+            <p style={{ ...BODY, maxWidth: 640 }}>
+              Real-time proof that the verification ledger remains append-only, tamper-evident, and exportable for
+              EU AI Act record-keeping obligations.
+            </p>
           </div>
-        </div>
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide">Total Events</p>
-          <p className="text-2xl font-bold mt-1">{data.totalEvents}</p>
-        </div>
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide">Merkle Root</p>
-          <code className="text-xs font-mono text-brand-text mt-1 block break-all">
-            {data.merkleRoot ? data.merkleRoot.slice(0, 20) + "..." : "—"}
-          </code>
-        </div>
-      </div>
 
-      {/* Full Merkle root */}
-      {data.merkleRoot && (
-        <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-          <p className="text-xs text-brand-muted uppercase tracking-wide mb-2">Full Merkle Root</p>
-          <code className="text-xs font-mono text-emerald-400 break-all">{data.merkleRoot}</code>
-        </div>
-      )}
-
-      {/* Compliance status */}
-      <div className="bg-brand-surface border border-brand-border rounded-xl p-4">
-        <p className="text-xs text-brand-muted uppercase tracking-wide mb-3">EU AI Act Compliance Status</p>
-        <div className="space-y-2">
-          {complianceItems.map((item) => (
-            <div key={item.label} className="flex items-start gap-3 py-2 border-b border-brand-border/50 last:border-0">
-              <span className={`mt-0.5 text-sm ${item.status ? "text-emerald-400" : "text-amber-400"}`}>
-                {item.status ? "✓" : "⚠"}
-              </span>
-              <div>
-                <p className="text-sm text-brand-text">{item.label}</p>
-                <p className="text-xs text-brand-muted">{item.detail}</p>
+          <div className="dashboard-grid dashboard-grid-three">
+            <div className="dashboard-card dashboard-metric-card">
+              <p className="dashboard-card-label">Chain Status</p>
+              <div style={{ marginTop: 12 }}>
+                <span className={integrityTone(data.validChain)}>{data.validChain ? "Intact" : "Broken"}</span>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="dashboard-card dashboard-metric-card">
+              <p className="dashboard-card-label">Total Events</p>
+              <p className="dashboard-metric-value">{data.totalEvents}</p>
+              <p className="dashboard-card-copy">Recorded in the immutable audit trail</p>
+            </div>
+            <div className="dashboard-card dashboard-metric-card">
+              <p className="dashboard-card-label">Merkle Root</p>
+              <code className="dashboard-hash" style={{ display: "block", marginTop: 12 }}>
+                {data.merkleRoot ? `${data.merkleRoot.slice(0, 22)}...` : "—"}
+              </code>
+              <p className="dashboard-card-copy">Last checked {new Date(data.checkedAt).toLocaleString()}</p>
+            </div>
+          </div>
 
-      {/* Export buttons */}
-      <div className="flex gap-3">
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="bg-brand-accent text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-        >
-          {exporting ? "Exporting..." : "Export JSON (Art. 19)"}
-        </button>
-        <button
-          disabled
-          className="bg-brand-surface border border-brand-border text-brand-muted rounded-lg px-4 py-2.5 text-sm font-medium cursor-not-allowed"
-          title="Coming soon"
-        >
-          Export XML (Coming Soon)
-        </button>
-      </div>
-    </div>
+          <div className="dashboard-grid dashboard-grid-two dashboard-detail-grid">
+            <div className="dashboard-card">
+              <SectionLabel>Compliance status</SectionLabel>
+              <div style={{ ...HEADING, fontSize: "clamp(28px, 3.6vw, 40px)", marginBottom: 20 }}>Operational checklist.</div>
+              <div className="dashboard-compliance-list">
+                {complianceItems.map((item) => (
+                  <div key={item.label} className="dashboard-compliance-item">
+                    <span className={item.status ? "dashboard-compliance-dot ok" : "dashboard-compliance-dot warn"} />
+                    <div>
+                      <p className="dashboard-primary-cell">{item.label}</p>
+                      <p className="dashboard-card-copy">{item.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="dashboard-card">
+              <SectionLabel>Evidence export</SectionLabel>
+              <div style={{ ...HEADING, fontSize: "clamp(28px, 3.6vw, 40px)", marginBottom: 18 }}>Regulator-ready output.</div>
+              <p style={{ ...BODY, fontSize: 15, maxWidth: 520, marginBottom: 24 }}>
+                Generate a signed JSON package of verification events and reviews with the same clean interface language
+                as the landing page, while preserving the audit-ledger evidence operators need.
+              </p>
+              {data.merkleRoot ? (
+                <div className="dashboard-code-block" style={{ marginBottom: 24 }}>
+                  <p className="dashboard-card-label">Full Merkle Root</p>
+                  <code className="dashboard-hash dashboard-hash-full">{data.merkleRoot}</code>
+                </div>
+              ) : null}
+              <div className="dashboard-actions">
+                <button type="button" onClick={handleExport} disabled={exporting} className="btn-black">
+                  {exporting ? "Exporting..." : "Export JSON"}
+                </button>
+                <button type="button" disabled className="btn-outline dashboard-disabled-button" title="Coming soon">
+                  Export XML
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

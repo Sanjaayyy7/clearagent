@@ -1,9 +1,10 @@
 const API_URL = import.meta.env.VITE_API_URL || "";
 const API_KEY = import.meta.env.VITE_API_KEY;
-if (!API_KEY && import.meta.env.PROD) {
-  throw new Error("VITE_API_KEY must be set in production.");
+if (!API_KEY) {
+  // eslint-disable-next-line no-console
+  console.warn("[ClearAgent] VITE_API_KEY is not set. API requests will fail with 401.");
 }
-const EFFECTIVE_KEY = API_KEY ?? "ca_test_demo_key_clearagent_2026";
+const EFFECTIVE_KEY = API_KEY ?? "";
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {

@@ -15,6 +15,11 @@ export function SplineScene({ scene, className, style }: SplineSceneProps) {
     if (!wrapper) return;
 
     const hideOverlay = () => {
+      document.querySelectorAll<HTMLElement>(".spline-watermark, [class*='watermark'], a[href*='spline.design']").forEach((node) => {
+        node.style.display = "none";
+        node.style.pointerEvents = "none";
+      });
+
       const canvas = wrapper.querySelector("canvas");
       if (!canvas) return;
       // Hide every DOM sibling Spline injects next to the canvas
@@ -44,7 +49,7 @@ export function SplineScene({ scene, className, style }: SplineSceneProps) {
   }, [scene]);
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#ffffff" }}>
       <Spline
         scene={scene}
         className={className}

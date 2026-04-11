@@ -64,6 +64,13 @@ export interface Job {
   updatedAt: string;
 }
 
+export interface RegisteredAgent {
+  agentId: string;
+  apiKey: string;
+  status: string;
+  registeredAt: string;
+}
+
 export interface CompletedJob extends Job {
   status: "completed";
   eventId: string;
@@ -98,9 +105,14 @@ export interface AuditExport {
 }
 
 export interface EventsListResponse {
-  events: VerificationEvent[];
-  nextCursor?: string;
-  hasMore: boolean;
+  data: VerificationEvent[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset?: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+  };
 }
 
 export interface PollOptions {
@@ -181,8 +193,8 @@ class AgentsResource {
     modelProvider?: string;
     modelId?: string;
     description?: string;
-  }): Promise<Agent> {
-    return this.http.post<Agent>("/v1/agents/register", data);
+  }): Promise<RegisteredAgent> {
+    return this.http.post<RegisteredAgent>("/v1/agents/register", data);
   }
 
   suspend(agentId: string): Promise<{ agentId: string; status: string }> {
@@ -205,6 +217,7 @@ class EventsResource {
     input: Record<string, unknown>;
     eventType?: string;
     eventCategory?: string;
+    agentId?: string;
     sessionId?: string;
     parentEventId?: string;
     sequenceNum?: number;
@@ -219,7 +232,6 @@ class EventsResource {
   list(filters?: {
     agentId?: string;
     status?: string;
-    decision?: string;
     from?: string;
     to?: string;
     limit?: number;
@@ -228,7 +240,6 @@ class EventsResource {
     const params = new URLSearchParams();
     if (filters?.agentId) params.set("agent_id", filters.agentId);
     if (filters?.status) params.set("status", filters.status);
-    if (filters?.decision) params.set("decision", filters.decision);
     if (filters?.from) params.set("from", filters.from);
     if (filters?.to) params.set("to", filters.to);
     if (filters?.limit !== undefined) params.set("limit", String(filters.limit));

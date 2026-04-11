@@ -1,11 +1,14 @@
 import type { Request, Response, NextFunction } from "express";
+import bcrypt from "bcrypt";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "../db/index.js";
 
 /**
  * API key authentication middleware.
- * For MVP: checks against a single hardcoded demo key from env.
- * Production: would hash-compare against api_keys table.
+ * Accepts a bearer token or ?api_key= query param, resolves the matching
+ * api_keys record by prefix, and bcrypt-compares the raw key to the stored hash.
  */
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   // Accept key from Authorization header OR ?api_key= query param (required for EventSource/SSE)
   const authHeader = req.headers.authorization;
   const queryKey = req.query.api_key as string | undefined;
@@ -21,9 +24,23 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const apiKey = authHeader ? authHeader.slice(7) : queryKey!;
-  const demoKey = process.env.DEMO_API_KEY || "ca_test_demo_key_clearagent_2026";
+  const keyPrefix = apiKey.slice(0, 12);
 
-  if (apiKey !== demoKey) {
+  const candidates = await db
+    .select()
+    .from(schema.apiKeys)
+    .where(and(eq(schema.apiKeys.keyPrefix, keyPrefix), eq(schema.apiKeys.revoked, false)));
+
+  let matchedKey: typeof candidates[number] | null = null;
+  for (const candidate of candidates) {
+    const isMatch = await bcrypt.compare(apiKey, candidate.keyHash);
+    if (isMatch) {
+      matchedKey = candidate;
+      break;
+    }
+  }
+
+  if (!matchedKey) {
     res.status(401).json({
       error: {
         code: "invalid_api_key",
@@ -33,10 +50,16 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return;
   }
 
+  await db
+    .update(schema.apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(schema.apiKeys.id, matchedKey.id));
+
   // Attach auth context to request
   (req as any).auth = {
-    orgId: null, // Will be set after seed
-    agentId: null,
+    orgId: matchedKey.orgId,
+    agentId: matchedKey.agentId,
+    apiKeyId: matchedKey.id,
     apiKey: apiKey,
   };
 
