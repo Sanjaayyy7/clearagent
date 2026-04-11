@@ -26,7 +26,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/packages/sdk/dist ./packages/sdk/dist
-COPY packages/sdk/health.cjs ./packages/sdk/health.cjs
+COPY --from=builder /app/packages/sdk/health.cjs ./packages/sdk/health.cjs
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY packages/sdk/package.json ./packages/sdk/

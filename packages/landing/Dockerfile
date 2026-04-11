@@ -30,7 +30,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/packages/landing/dist ./packages/landing/dist
-COPY packages/landing/server.cjs ./packages/landing/server.cjs
+COPY --from=builder /app/packages/landing/server.cjs ./packages/landing/server.cjs
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY packages/landing/package.json ./packages/landing/

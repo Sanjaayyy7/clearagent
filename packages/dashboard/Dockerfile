@@ -30,7 +30,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/packages/dashboard/dist ./packages/dashboard/dist
-COPY packages/dashboard/server.cjs ./packages/dashboard/server.cjs
+COPY --from=builder /app/packages/dashboard/server.cjs ./packages/dashboard/server.cjs
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY packages/dashboard/package.json ./packages/dashboard/
