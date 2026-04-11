@@ -59,29 +59,32 @@ router.post("/verify", validate(verifySchema), async (req, res, next) => {
     }
     const retentionDays = org[0].dataRetentionDays;
 
-    // Resolve agent: explicit body.agentId must match the authenticated key if one is bound.
+    // Resolve agent: org-level keys may target any org agent; agent-bound keys may only target themselves.
     const authenticatedAgentId = auth?.agentId as string | undefined;
 
     let agentId: string;
     if (body.agentId) {
-      if (authenticatedAgentId && body.agentId !== authenticatedAgentId) {
-        res.status(403).json({
-          error: {
-            code: "agent_mismatch",
-            message: "Authenticated API key cannot submit events for a different agent",
-          },
-        });
-        return;
-      }
-
       const specificAgent = await db.select().from(schema.agents).where(eq(schema.agents.id, body.agentId)).limit(1);
       if (specificAgent.length === 0) {
+        res.status(404).json({ error: { code: "not_found", message: `Agent ${body.agentId} not found` } });
+        return;
+      }
+      if (specificAgent[0].orgId !== orgId) {
         res.status(404).json({ error: { code: "not_found", message: `Agent ${body.agentId} not found` } });
         return;
       }
       if (specificAgent[0].status === "suspended") {
         res.status(403).json({
           error: { code: "agent_suspended", message: "Agent is suspended and cannot submit verification events" },
+        });
+        return;
+      }
+      if (authenticatedAgentId && body.agentId !== authenticatedAgentId) {
+        res.status(403).json({
+          error: {
+            code: "agent_mismatch",
+            message: "Authenticated API key cannot submit events for a different agent",
+          },
         });
         return;
       }
