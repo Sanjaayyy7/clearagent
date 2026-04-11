@@ -57,7 +57,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: packages/api
-        run: npx vitest run src/__tests__/hashchain.unit.test.ts
+        run: npx vitest run src/__tests__/hashchain.unit.test.ts src/__tests__/auditexport.unit.test.ts
 
   integration-tests:
     name: Integration Tests

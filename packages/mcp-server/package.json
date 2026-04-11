@@ -1,16 +1,19 @@
 {
-  "name": "@clearagent/mcp-server",
+  "name": "@clearagents/mcp-server",
   "version": "0.2.0",
   "description": "MCP server for ClearAgent AI verification and audit trail",
-  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "clearagent-mcp": "./dist/index.js"
+    "clearagent-mcp": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
