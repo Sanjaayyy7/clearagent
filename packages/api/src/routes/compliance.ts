@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { db, schema } from "../db/index.js";
-import { eq, and, lt, isNotNull, desc, sql, count } from "drizzle-orm";
+import { eq, and, gte, isNotNull, desc, sql, count } from "drizzle-orm";
 import { logger } from "../logger.js";
 
 const router = Router();
@@ -69,7 +69,7 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
     .where(
       and(
         eq(schema.verificationEvents.orgId, orgId),
-        sql`${schema.verificationEvents.recordedAt} >= ${sevenDaysAgo}`
+        gte(schema.verificationEvents.recordedAt, sevenDaysAgo)
       )
     );
 
@@ -160,7 +160,7 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
       and(
         eq(schema.humanReviews.orgId, orgId),
         eq(schema.humanReviews.reviewerRole, "system"),
-        sql`${schema.humanReviews.reviewCompletedAt} >= ${sevenDaysAgo}`
+        gte(schema.humanReviews.reviewCompletedAt, sevenDaysAgo)
       )
     );
 
