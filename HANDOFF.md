@@ -1,15 +1,14 @@
 # ClearAgent — Session Handoff
-Generated: 2026-04-12
-Context: ~60%
+Generated: 2026-04-11
+Context: ~40%
 
 ---
 
 ## STATE
-- Tests: 76 passing, 5 files (src-only — no dist duplication)
-- LOC: 8,781
-- Last commit: 1f30568 (fix: compliance/score Date crash + vitest dedup)
+- Tests: 96 passing, 6 files
+- Last commit: c11128d (test(compliance): 20 unit tests for Art. 12/14/19 scoring + SLA breach SSE notify)
 - Local API: HEALTHY, hash chain VALID (83 events), compliance score: 90/A
-- Railway: ALL 5 SERVICES ONLINE
+- Railway: ALL 5 SERVICES ONLINE (queue broken until REDIS_URL set)
 
 ---
 
@@ -17,19 +16,14 @@ Context: ~60%
 
 | Task | Commit | Notes |
 |------|--------|-------|
-| Full project audit (19-step) | — | Plan file updated |
-| docs/mcp-setup.md | 2e785eb | Claude Desktop integration guide |
-| docs/design-partners-tracker.md | 2e785eb | 10 slots, email template, call script |
-| docs/yc/application.md | 2e785eb | Full YC S26 answers (needs Sanjay to fill name + URLs) |
-| SLA worker contentHash → sha256() | 39262d2 | Art. 14 non-repudiation fixed |
-| XML export tests (5 → 16) | 39262d2 | Full XML format coverage |
-| DEPT_STATUS.md created | — | Autonomous operating system state file |
-| compliance/score Date crash fixed | 1f30568 | GET /v1/compliance/score returns 90/A |
-| vitest config deduplicated | 1f30568 | No more dist/ test double-runs |
+| Codebase audit — AUTO-1 through AUTO-7 | — | All 6 tasks already done from prior sessions |
+| compliance/score pure scoring function | c11128d | `scoreFromInputs()` exported for unit testing |
+| 20 compliance unit tests | c11128d | Art. 12/14/19 coverage, status thresholds, edge cases |
+| SLA breach SSE notification | c11128d | pg_notify in sla.worker.ts after escalation insert |
 
 ---
 
-## IN PROGRESS (nothing incomplete — all tasks closed)
+## IN PROGRESS (nothing incomplete)
 
 ---
 
@@ -42,14 +36,14 @@ Set in Railway @clearagent/api Variables:
 Then: `railway run npm run db:migrate --workspace=packages/api`
 
 **Priority 2 — Autonomous (no Sanjay needed):**
-Write 3 compliance/score unit tests in `packages/api/src/__tests__/compliance.unit.test.ts`:
-- score=100 for org with valid chain + no overdue reviews + recent export
-- broken chain deducts 20 points from Art. 12
-- overdue reviews deducts 10 points from Art. 14
+Update README.md with production URLs once Railway deploy is confirmed:
+- Add Live Demo table: API health, Dashboard, Demo mode, Metrics
+- Update packages/dashboard/.env.production with real VITE_API_URL
 
 **Priority 3 — Autonomous:**
-Add SLA breach SSE notification: in `sla.worker.ts` after the escalation insert,
-call `db.$client.query("SELECT pg_notify('verification_events', $1)", [JSON.stringify({ type: 'sla_breach', eventId, orgId })])` — pushes breach to dashboard SSE stream in real time.
+EscalatedReviews.tsx uses a client-side filter on the full event list.
+Add a `GET /v1/events?requires_review=true` query param to eventsRouter so the
+dashboard can page through unreviewed events without fetching everything.
 
 ---
 
@@ -65,18 +59,18 @@ call `db.$client.query("SELECT pg_notify('verification_events', $1)", [JSON.stri
 
 ## KEY DECISIONS MADE
 
+- scoreFromInputs() is the pure testable scoring kernel; computeScore() is the DB fetch wrapper
+- Bonuses push uncapped score to 115 (art12 max 40, art14 max 40, art19 max 35); cap at 100
+- SLA breach pg_notify uses a short-lived dedicated postgres connection; failure is warn, not error
 - vitest include/exclude: test only src/, never dist/ — prevents double-counting
-- compliance.ts: use drizzle's gte() for Date params, never raw sql`` template with Date
-- SLA escalation: contentHash = sha256(canonical pipe-delimited string) for Art. 14
-- Docker rebuild required for code changes (API runs from baked image, not mounted volume)
 
 ---
 
 ## PRODUCTION STATUS
-- API: ONLINE (Railway) — but queue broken until REDIS_URL set
+- API: ONLINE (Railway) — queue broken until REDIS_URL set
 - Dashboard: ONLINE (Railway)
 - Landing: ONLINE (Railway)
 - MCP Server: ONLINE (Railway)
-- SDK: ONLINE (Railway health check) — but NOT published to npm
+- SDK: ONLINE (Railway health check) — NOT published to npm
 - Local API: HEALTHY (docker compose, port 3000)
-- Local tests: 76/76 passing
+- Local tests: 96/96 passing
