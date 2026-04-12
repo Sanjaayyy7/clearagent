@@ -224,11 +224,14 @@ router.get("/", async (req, res, next) => {
     const auth = (req as any).auth;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
-    const { agent_id, status, from, to, cursor } = req.query;
+    const { agent_id, status, from, to, cursor, requires_review } = req.query;
 
     const conditions = [eq(schema.verificationEvents.orgId, auth.orgId)];
     if (agent_id) conditions.push(eq(schema.verificationEvents.agentId, agent_id as string));
     if (status) conditions.push(eq(schema.verificationEvents.status, status as string));
+    if (requires_review !== undefined) {
+      conditions.push(eq(schema.verificationEvents.requiresReview, requires_review === "true"));
+    }
     if (from) conditions.push(gte(schema.verificationEvents.occurredAt, new Date(from as string)));
     if (to) conditions.push(lte(schema.verificationEvents.occurredAt, new Date(to as string)));
 

@@ -1,13 +1,22 @@
 # ClearAgent
 
+[![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://clearagentapi-production.up.railway.app/v1/health)
+[![npm](https://img.shields.io/npm/v/@clearagent/sdk)](https://www.npmjs.com/package/@clearagent/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)]()
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D.svg)]()
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)]()
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Art.12%20%C2%B7%2014%20%C2%B7%2019-green.svg)]()
 
 > Append-only audit trail and human oversight protocol for AI agents. EU AI Act compliant by design.
+
+## Live
+
+| | |
+|---|---|
+| **API** | https://clearagentapi-production.up.railway.app/v1/health |
+| **Metrics** | https://clearagentapi-production.up.railway.app/v1/metrics |
+| **Integrity** | https://clearagentapi-production.up.railway.app/v1/audit/integrity |
 
 ## What is ClearAgent?
 
