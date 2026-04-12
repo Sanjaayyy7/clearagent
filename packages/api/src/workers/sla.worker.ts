@@ -11,6 +11,7 @@ import { Redis as IORedis } from "ioredis";
 import { db, schema } from "../db/index.js";
 import { and, eq } from "drizzle-orm";
 import { logger } from "../logger.js";
+import { sha256 } from "../services/hashChain.js";
 
 export const SLA_QUEUE_NAME = "sla-enforcement";
 
@@ -61,8 +62,8 @@ async function processSlaEscalation(job: Job<SlaJobData>): Promise<void> {
     reviewRequestedAt: new Date(now.getTime() - slaSeconds * 1000),
     reviewCompletedAt: now,
     reviewSlaMs: slaSeconds * 1000,
-    // contentHash binding: sha256 of the escalation record inputs
-    contentHash: `system-escalation-${eventId}-${now.toISOString()}`,
+    // contentHash binding: SHA-256 of the escalation record inputs (Art. 14 non-repudiation)
+    contentHash: sha256(`system-escalation|${eventId}|${policyName}|${slaSeconds}|${now.toISOString()}`),
   });
 
   log.warn({ policyName, slaSeconds }, "SLA breach — escalation record inserted (Art. 14)");
