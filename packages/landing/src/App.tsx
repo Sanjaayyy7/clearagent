@@ -174,6 +174,7 @@ function Nav() {
 
 /* ── Hero ────────────────────────────────────────────────── */
 function Hero() {
+  const liveCount = useLiveEventCount(80);
   return (
     <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "#ffffff", position: "relative", overflow: "hidden" }}>
       {/* Spline Scene — right half only, fills 50% of hero */}
@@ -196,7 +197,7 @@ function Hero() {
             <a href="https://github.com/Sanjaayyy7/clearagent" className="btn-outline">Read the docs</a>
           </div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888888", letterSpacing: "0.02em" }}>
-            80 events verified &nbsp;&nbsp;·&nbsp;&nbsp; 100% chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; 10 human reviews
+            {liveCount} events verified &nbsp;&nbsp;·&nbsp;&nbsp; 100% chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; 10 human reviews
           </div>
         </div>
       </div>
@@ -537,8 +538,9 @@ function ComplianceStats() {
   const [ref, visible] = useInView();
   const deadline = new Date("2026-08-01T00:00:00Z");
   const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / 86400000));
+  const liveCount = useLiveEventCount(80);
   const stats = [
-    { dot: "#22c55e", value: "80", label: "Events Verified", sub: "All append-only, hash-chained" },
+    { dot: "#22c55e", value: String(liveCount), label: "Events Verified", sub: "All append-only, hash-chained" },
     { dot: "#22c55e", value: "100%", label: "Chain Integrity", sub: "Zero tampering detected" },
     { dot: "#f59e0b", value: String(daysLeft), label: "Days Remaining", sub: "To EU AI Act enforcement" },
   ];
