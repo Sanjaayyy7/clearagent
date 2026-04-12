@@ -8,6 +8,7 @@
  */
 import { Queue, Worker, type Job } from "bullmq";
 import { Redis as IORedis } from "ioredis";
+import postgres from "postgres";
 import { db, schema } from "../db/index.js";
 import { and, eq } from "drizzle-orm";
 import { logger } from "../logger.js";
@@ -67,6 +68,20 @@ async function processSlaEscalation(job: Job<SlaJobData>): Promise<void> {
   });
 
   log.warn({ policyName, slaSeconds }, "SLA breach — escalation record inserted (Art. 14)");
+
+  // Notify SSE subscribers of the SLA breach so the dashboard updates in real time
+  try {
+    const connectionString = process.env.DATABASE_URL ?? "postgresql://clearagent:clearagent@localhost:5432/clearagent";
+    const notifyClient = postgres(connectionString, { max: 1 });
+    await notifyClient.notify(
+      "verification_events",
+      JSON.stringify({ type: "sla_breach", eventId, orgId, policyName, slaSeconds })
+    );
+    await notifyClient.end();
+  } catch (notifyErr) {
+    // Non-critical — log but never let this block or fail the escalation record
+    log.warn({ err: (notifyErr as Error).message }, "SLA breach pg_notify failed (non-critical)");
+  }
 }
 
 export function startSlaWorker(redisConnection: IORedis): Worker<SlaJobData> {

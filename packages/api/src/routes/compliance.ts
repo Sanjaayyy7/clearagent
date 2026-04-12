@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { db, schema } from "../db/index.js";
-import { eq, and, gte, isNotNull, desc, sql, count } from "drizzle-orm";
+import { eq, and, gte, isNotNull, desc, sql } from "drizzle-orm";
 import { logger } from "../logger.js";
 
 const router = Router();
@@ -40,10 +40,19 @@ export interface ComplianceScore {
   daysToEnforcement: number;
 }
 
-async function computeScore(orgId: string): Promise<ComplianceScore> {
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
+// ─── Pure scoring logic (exported for unit testing) ──────────────────────────
+
+export interface ScoringInputs {
+  hasCheckpoint: boolean;
+  recentEventCount: number;   // events in last 7 days
+  rfc3161Coverage: number;    // 0.0 – 1.0 ratio of anchored checkpoints
+  overdueReviewCount: number; // flagged events with requiresReview=true and no completed review
+  slaBreachCount: number;     // system-escalated reviews in last 7 days
+  hasRecentExport: boolean;   // export completed within last 30 days
+}
+
+export function scoreFromInputs(inputs: ScoringInputs): Pick<ComplianceScore, "score" | "grade" | "status" | "breakdown"> {
+  const { hasCheckpoint, recentEventCount, rfc3161Coverage, overdueReviewCount, slaBreachCount, hasRecentExport } = inputs;
 
   let art12Score = 35;
   let art14Score = 35;
@@ -52,9 +61,51 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
   const art14Gaps: string[] = [];
   const art19Gaps: string[] = [];
 
-  // ─── Art. 12: Logging & Traceability ──────────────────────────
+  // Art. 12
+  if (!hasCheckpoint) { art12Score -= 20; art12Gaps.push("no_integrity_checkpoints"); }
+  if (recentEventCount === 0) { art12Score -= 5; art12Gaps.push("no_events_last_7d"); }
+  if (rfc3161Coverage === 0) {
+    art12Score -= 5; art12Gaps.push("rfc3161_not_anchored");
+  } else if (rfc3161Coverage > 0.5) {
+    art12Score = Math.min(art12Score + 5, 40);
+  } else {
+    art12Gaps.push("rfc3161_partial");
+  }
 
-  // Check hash chain integrity (most recent checkpoint)
+  // Art. 14
+  if (overdueReviewCount > 0) { art14Score -= 10; art14Gaps.push(`overdue_reviews_${overdueReviewCount}`); }
+  if (slaBreachCount > 0) { art14Score -= 15; art14Gaps.push("sla_breaches_last_7d"); }
+  if (overdueReviewCount === 0 && slaBreachCount === 0) { art14Score = Math.min(art14Score + 5, 40); }
+
+  // Art. 19
+  if (!hasRecentExport) { art19Score -= 10; art19Gaps.push("no_export_last_30d"); }
+  art19Score = Math.min(art19Score + 5, 35); // XML export bonus
+
+  const art12Final = Math.max(0, art12Score);
+  const art14Final = Math.max(0, art14Score);
+  const art19Final = Math.max(0, art19Score);
+  const score = Math.min(100, Math.max(0, art12Final + art14Final + art19Final));
+  const status: ComplianceScore["status"] = score >= 80 ? "compliant" : score >= 60 ? "at_risk" : "non_compliant";
+
+  return {
+    score,
+    grade: gradeFromScore(score),
+    status,
+    breakdown: {
+      article12: { score: art12Final, max: 40, gaps: art12Gaps },
+      article14: { score: art14Final, max: 40, gaps: art14Gaps },
+      article19: { score: art19Final, max: 35, gaps: art19Gaps },
+    },
+  };
+}
+
+async function computeScore(orgId: string): Promise<ComplianceScore> {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
+
+  // ─── Fetch data from DB ───────────────────────────────────────
+
   const [latestCheckpoint] = await db
     .select()
     .from(schema.integrityCheckpoints)
@@ -62,8 +113,7 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
     .orderBy(desc(schema.integrityCheckpoints.checkpointAt))
     .limit(1);
 
-  // No events in last 7 days — may indicate logging gap
-  const [recentEventCount] = await db
+  const [recentEventRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.verificationEvents)
     .where(
@@ -73,18 +123,7 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
       )
     );
 
-  if (!latestCheckpoint) {
-    art12Score -= 20;
-    art12Gaps.push("no_integrity_checkpoints");
-  }
-
-  if ((recentEventCount?.count ?? 0) === 0) {
-    art12Score -= 5;
-    art12Gaps.push("no_events_last_7d");
-  }
-
-  // RFC 3161 anchoring coverage
-  const [anchoredCount] = await db
+  const [anchoredRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.integrityCheckpoints)
     .where(
@@ -94,31 +133,16 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
       )
     );
 
-  const totalCheckpoints = latestCheckpoint ? 1 : 0; // simplified
-  const [allCheckpointsCount] = await db
+  const [allCheckpointsRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.integrityCheckpoints)
     .where(eq(schema.integrityCheckpoints.orgId, orgId));
 
   const rfc3161Coverage =
-    (allCheckpointsCount?.count ?? 0) > 0
-      ? (anchoredCount?.count ?? 0) / (allCheckpointsCount?.count ?? 1)
+    (allCheckpointsRow?.count ?? 0) > 0
+      ? (anchoredRow?.count ?? 0) / (allCheckpointsRow?.count ?? 1)
       : 0;
 
-  if (rfc3161Coverage === 0) {
-    art12Score -= 5;
-    art12Gaps.push("rfc3161_not_anchored");
-  } else if (rfc3161Coverage > 0.5) {
-    art12Score += 5; // bonus
-    // cap at max
-    art12Score = Math.min(art12Score, 40);
-  } else {
-    art12Gaps.push("rfc3161_partial");
-  }
-
-  // ─── Art. 14: Human Oversight ────────────────────────────────
-
-  // Count overdue reviews (requiresReview=true, no completed review)
   const overdueEvents = await db
     .select({ id: schema.verificationEvents.id })
     .from(schema.verificationEvents)
@@ -131,7 +155,6 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
     )
     .limit(100);
 
-  // Check which have no completed reviews (non-system)
   let overdueCount = 0;
   for (const ev of overdueEvents) {
     const [review] = await db
@@ -147,13 +170,7 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
     if (!review) overdueCount++;
   }
 
-  if (overdueCount > 0) {
-    art14Score -= 10;
-    art14Gaps.push(`overdue_reviews_${overdueCount}`);
-  }
-
-  // SLA breaches in last 7 days (system-escalated reviews)
-  const [slaBreach] = await db
+  const [slaBreachRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.humanReviews)
     .where(
@@ -164,20 +181,6 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
       )
     );
 
-  if ((slaBreach?.count ?? 0) > 0) {
-    art14Score -= 15;
-    art14Gaps.push("sla_breaches_last_7d");
-  }
-
-  // Bonus: all reviews within SLA
-  if (overdueCount === 0 && (slaBreach?.count ?? 0) === 0) {
-    art14Score += 5;
-    art14Score = Math.min(art14Score, 40);
-  }
-
-  // ─── Art. 19: Record Keeping ──────────────────────────────────
-
-  // Last export within 30 days
   const [lastExport] = await db
     .select({ completedAt: schema.auditExports.completedAt })
     .from(schema.auditExports)
@@ -185,38 +188,21 @@ async function computeScore(orgId: string): Promise<ComplianceScore> {
     .orderBy(desc(schema.auditExports.completedAt))
     .limit(1);
 
-  if (!lastExport || !lastExport.completedAt || lastExport.completedAt < thirtyDaysAgo) {
-    art19Score -= 10;
-    art19Gaps.push("no_export_last_30d");
-  }
+  // ─── Delegate to pure scoring function ────────────────────────
 
-  // XML export available (always true if implemented)
-  art19Score += 5; // bonus — XML support exists
-  art19Score = Math.min(art19Score, 35);
+  const computed = scoreFromInputs({
+    hasCheckpoint: !!latestCheckpoint,
+    recentEventCount: recentEventRow?.count ?? 0,
+    rfc3161Coverage,
+    overdueReviewCount: overdueCount,
+    slaBreachCount: slaBreachRow?.count ?? 0,
+    hasRecentExport: !!(lastExport?.completedAt && lastExport.completedAt >= thirtyDaysAgo),
+  });
 
-  // ─── Final score ──────────────────────────────────────────────
-
-  const art12Final = Math.max(0, art12Score);
-  const art14Final = Math.max(0, art14Score);
-  const art19Final = Math.max(0, art19Score);
-
-  const total = art12Final + art14Final + art19Final;
-  const score = Math.min(100, Math.max(0, total));
-
-  const status: ComplianceScore["status"] =
-    score >= 80 ? "compliant" : score >= 60 ? "at_risk" : "non_compliant";
-
-  logger.debug({ orgId, score, art12: art12Final, art14: art14Final, art19: art19Final }, "Compliance score calculated");
+  logger.debug({ orgId, score: computed.score }, "Compliance score calculated");
 
   return {
-    score,
-    grade: gradeFromScore(score),
-    status,
-    breakdown: {
-      article12: { score: art12Final, max: 40, gaps: art12Gaps },
-      article14: { score: art14Final, max: 40, gaps: art14Gaps },
-      article19: { score: art19Final, max: 35, gaps: art19Gaps },
-    },
+    ...computed,
     lastCalculated: now.toISOString(),
     daysToEnforcement: daysUntilEnforcement(),
   };
