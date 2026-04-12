@@ -41,6 +41,9 @@ const verificationQueue = new Queue(QUEUE_NAME, {
 app.set("verificationQueue", verificationQueue);
 
 // ─── Middleware ───────────────────────────────────────────────
+// Railway (and most PaaS) sit behind a proxy — trust one hop so that
+// express-rate-limit can read X-Forwarded-For without throwing.
+app.set("trust proxy", 1);
 app.use(helmet());
 
 const limiter = rateLimit({

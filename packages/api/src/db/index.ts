@@ -8,7 +8,7 @@ const client = postgres(connectionString, {
   max: process.env.NODE_ENV === "production" ? 3 : 10,
   idle_timeout: 20,
   connect_timeout: 30,
-  ssl: process.env.NODE_ENV === "production" ? "require" : undefined,
+  ssl: process.env.NODE_ENV === "production" ? true : undefined,
 });
 export const db = drizzle(client, { schema });
 
