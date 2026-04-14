@@ -1,5 +1,5 @@
 # ClearAgent Department Status
-Last updated: 2026-04-11
+Last updated: 2026-04-14
 Total LOC: 8,781 | Files: 146 | Commits: 39 | Tests: 96 (src-only)
 
 ---
@@ -13,11 +13,16 @@ EU AI Act: 113 days to enforcement
 
 ## SYSTEM STATE
 - Production API: https://clearagentapi-production.up.railway.app ✅ (health OK)
-- Production DB: BLOCKED — DATABASE_URL not set in Railway api service (see below)
+- Production DB: Neon.tech — DATABASE_URL set ✅
+- Production Redis: Upstash — REDIS_URL set ✅
+- Production JWT: JWT_SECRET set ✅
+- Dashboard: https://dashboard-sable-delta-88.vercel.app ✅ (deployed to Vercel)
+- CORS: DASHBOARD_URL + CORS_EXTRA_ORIGIN set on Railway ✅
 - Local API: HEALTHY (http://localhost:3000/v1/health)
 - Hash chain: VALID (83 events, merkleRoot confirmed)
 - Compliance score (local): 90/A
 - Tests: 96/96 passing
+- Infrastructure docs: docs/infrastructure.md ✅
 
 ---
 
@@ -52,8 +57,8 @@ COMPLETED:
 
 ### DEPT 3 — FRONTEND & DASHBOARD (Lena, Dev, Aiko)
 STATUS: Active
-CURRENT: Vercel deploy pending
-BLOCKED: Vercel deploy (needs `! vercel --prod` from Sanjay)
+CURRENT: none
+BLOCKED: none
 COMPLETED:
 - 5 pages: LiveFeed, EventDetail, IntegrityReport, AgentManagement, EscalatedReviews
 - 4 components: ComplianceWidget, EventRowSkeleton, ReviewForm, ErrorBoundary
@@ -61,6 +66,9 @@ COMPLETED:
 - Demo banner in App.tsx
 - ComplianceWidget: Art. 12/14/19 badges + countdown to Aug 2, 2026
 - .env.production set: VITE_API_URL=https://clearagentapi-production.up.railway.app
+- Dashboard deployed to Vercel: https://dashboard-sable-delta-88.vercel.app ✅
+- CORS configured on Railway (DASHBOARD_URL + CORS_EXTRA_ORIGIN)
+- Landing page live counter: useLiveStats hook fetches from production API
 
 ### DEPT 4 — DEVELOPER EXPERIENCE (James, Nadia, Tom)
 STATUS: BLOCKED — needs npm credentials
@@ -98,59 +106,49 @@ COMPLETED:
 STATUS: Active
 CURRENT: none
 BLOCKED:
-- Demo GIF recording (needs Vercel dashboard URL)
-- Vercel URL for README badges (once deployed)
+- Demo GIF recording (can now use Vercel dashboard URL)
 COMPLETED:
 - README: production API badges + Live section added
+- README: Dashboard badge added (https://dashboard-sable-delta-88.vercel.app)
 - README: API URL https://clearagentapi-production.up.railway.app documented
 - docs/launch/hn-show-hn.md, docs/launch/twitter-thread.md
 - CODEOWNERS + issue templates + PR template
 
 ### DEPT 8 — DEVOPS (Raj, Ana, Ben)
-STATUS: BLOCKED — 1 Railway variable missing
-CURRENT: DATABASE_URL not wired to running API container
-BLOCKED:
-- DATABASE_URL not set in Railway api service (migrate/seed work via `railway run` but running container uses localhost:5432)
+STATUS: Active
+CURRENT: Monitoring production stability
+BLOCKED: none
 COMPLETED:
-- REDIS_URL provided (rediss://default:gQAA...@enabled-pug-96749.upstash.io:6379)
+- DATABASE_URL set in Railway ✅
+- REDIS_URL set in Railway ✅
+- JWT_SECRET set in Railway ✅
+- DASHBOARD_URL + CORS_EXTRA_ORIGIN set in Railway ✅
 - railway run npm run db:migrate — ran successfully
 - railway run npm run seed — ran successfully (80 events seeded)
 - All 5 Railway services: ONLINE
+- Dashboard deployed to Vercel ✅
 - packages/api/Dockerfile universal
 - Per-service Dockerfiles (dashboard, landing, sdk, mcp-server)
 - CI: ci.yml (typecheck, unit tests, integration tests)
 - OOM fixes (deferred workers, pool=3, concurrency=2)
+- docs/infrastructure.md: comprehensive runbook for all services
 
 ---
 
 ## PENDING HUMAN ACTIONS (only Sanjay can do these)
 
-### CRITICAL — unblocks production (5 min)
-1. **Railway DATABASE_URL**: In Railway → @clearagent/api → Variables → add the DATABASE_URL
-   from the Railway PostgreSQL service (copy from the Postgres service's "Connect" tab)
+### COMPLETED ✅
+1. ~~Railway DATABASE_URL~~ ✅ Set
+2. ~~Railway REDIS_URL~~ ✅ Set
+3. ~~Railway JWT_SECRET~~ ✅ Set
+4. ~~Deploy dashboard to Vercel~~ ✅ https://dashboard-sable-delta-88.vercel.app
+5. ~~Update CORS~~ ✅ DASHBOARD_URL + CORS_EXTRA_ORIGIN set
 
-2. **Railway REDIS_URL**: Add:
-   `REDIS_URL=rediss://default:gQAAAAAAAXntAAIncDJlNWQwMmVmMGJlZTQ0YWY2YTUxMTZmYzY3MmQxZGZkMnAyOTY3NDk@enabled-pug-96749.upstash.io:6379`
-
-3. **Railway JWT_SECRET**: Run `! openssl rand -hex 32` → paste as JWT_SECRET env var
-
-### THEN — deploy dashboard
-4. **Deploy dashboard to Vercel**:
-   ```
-   ! cd packages/dashboard && vercel --prod
-   ```
-   After deploy: set `VITE_API_URL=https://clearagentapi-production.up.railway.app` in Vercel env vars
-
-5. **Update CORS**: Once you have Vercel URL:
-   ```
-   ! railway variables set DASHBOARD_URL=https://[vercel-url]
-   ```
-
-### THEN — ship SDK + YC
-6. **npm publish**: Run `! npm login` then:
-   ```
-   ! npm publish --workspace=packages/sdk --access public
-   ! npm publish --workspace=packages/mcp-server --access public
+### REMAINING — ship SDK + YC
+6. **npm publish**: Run `npm login` then:
+   ```bash
+   npm publish --workspace=packages/sdk --access public
+   npm publish --workspace=packages/mcp-server --access public
    ```
 
 7. **YC application**: Open `docs/yc/application.md` → fill personal answers → submit by **May 4, 2026**
@@ -174,4 +172,4 @@ COMPLETED:
 | compliance/score → internal_error | sql template Date param crashes postgres.js | Replace with gte() | 1f30568 |
 | vitest runs dist/ + src/ tests (duplicate) | vitest.config.ts missing include/exclude | Add include: src/**/*.test.ts | 1f30568 |
 | SLA worker contentHash not SHA-256 | Raw string template instead of sha256() | sha256(system-escalation\|...) | 39262d2 |
-| Production 502 on all DB routes | DATABASE_URL not set in Railway API service env vars | Add DATABASE_URL in Railway dashboard | PENDING |
+| Production 502 on all DB routes | DATABASE_URL not set in Railway API service env vars | Add DATABASE_URL in Railway dashboard | ✅ Fixed |

@@ -1,6 +1,7 @@
 # ClearAgent
 
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://clearagentapi-production.up.railway.app/v1/health)
+[![Dashboard](https://img.shields.io/badge/Dashboard-live-blue)](https://dashboard-sable-delta-88.vercel.app)
 [![npm](https://img.shields.io/npm/v/@clearagent/sdk)](https://www.npmjs.com/package/@clearagent/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)]()
@@ -15,6 +16,7 @@
 | | |
 |---|---|
 | **API** | https://clearagentapi-production.up.railway.app/v1/health |
+| **Dashboard** | https://dashboard-sable-delta-88.vercel.app |
 | **Metrics** | https://clearagentapi-production.up.railway.app/v1/metrics |
 | **Integrity** | https://clearagentapi-production.up.railway.app/v1/audit/integrity |
 

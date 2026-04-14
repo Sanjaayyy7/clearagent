@@ -41,6 +41,29 @@ function useLiveEventCount(fallback = 80): number {
   return count;
 }
 
+function useLiveStats(fallback = { events: 80, integrity: "100%", reviews: 10 }) {
+  const [stats, setStats] = useState(fallback);
+  useEffect(() => {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL || "";
+    if (!apiUrl) return;
+    fetch(`${apiUrl}/v1/audit/integrity`, {
+      headers: { Authorization: `Bearer ${(import.meta as any).env?.VITE_API_KEY || "ca_test_demo_key_clearagent_2026"}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.totalEvents != null) {
+          setStats((prev) => ({
+            ...prev,
+            events: data.totalEvents,
+            integrity: data.status === "intact" ? "100%" : "CHECK",
+          }));
+        }
+      })
+      .catch(() => null);
+  }, []);
+  return stats;
+}
+
 function useCounter(target: number, duration: number, active: boolean): number {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -174,7 +197,7 @@ function Nav() {
 
 /* ── Hero ────────────────────────────────────────────────── */
 function Hero() {
-  const liveCount = useLiveEventCount(80);
+  const stats = useLiveStats();
   return (
     <section id="hero" style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 80, background: "#ffffff", position: "relative", overflow: "hidden" }}>
       {/* Spline Scene — right half only, fills 50% of hero */}
@@ -197,7 +220,7 @@ function Hero() {
             <a href="https://github.com/Sanjaayyy7/clearagent" className="btn-outline">Read the docs</a>
           </div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#888888", letterSpacing: "0.02em" }}>
-            {liveCount} events verified &nbsp;&nbsp;·&nbsp;&nbsp; 100% chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; 10 human reviews
+            {stats.events} events verified &nbsp;&nbsp;·&nbsp;&nbsp; {stats.integrity} chain integrity &nbsp;&nbsp;·&nbsp;&nbsp; {stats.reviews} human reviews
           </div>
         </div>
       </div>
