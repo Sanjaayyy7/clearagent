@@ -30,13 +30,16 @@ const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // ─── Infrastructure ──────────────────────────────────────────
+// BullMQ requires maxRetriesPerRequest: null on the ioredis connection.
+// When using Railway-internal Redis (redis://...) no TLS or auth is needed.
 const redisConnection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
   maxRetriesPerRequest: null,
-  // Disable TCP keepalive probes — saves Redis commands on idle connections.
-  // Upstash connection stays alive via TLS; no need for frequent pings.
-  enableAutoPipelining: false,
-  // BullMQ requires enableReadyCheck: false for serverless Redis (Upstash).
-  enableReadyCheck: false,
+});
+
+// Prevent unhandled Redis connection errors from crashing the process.
+// ioredis reconnects automatically; workers resume once the connection recovers.
+redisConnection.on("error", (err) => {
+  logger.error({ err: err.message }, "Redis connection error — workers will retry");
 });
 
 const verificationQueue = new Queue(QUEUE_NAME, {

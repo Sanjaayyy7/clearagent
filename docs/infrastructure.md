@@ -119,20 +119,28 @@ railway run npm run seed --workspace=packages/api
 
 ---
 
-### 3. Upstash Redis — Queue & Cache
+### 3. Railway Redis — Queue & Cache
 
-- **Provider**: Upstash (serverless Redis)
-- **Endpoint**: enabled-pug-96749.upstash.io:6379
-- **Connection**: TLS via REDIS_URL env var (`rediss://`)
+- **Provider**: Railway (Docker service — `redis:7-alpine`, same project)
+- **Internal URL**: `redis://redis.railway.internal:6379` (private network, no TLS, no auth)
+- **Connection**: `REDIS_URL` env var on the `@clearagent/api` service
 - **Used for**: BullMQ job queues
+- **Note**: No request quotas, no third-party dependency. Runs on the Railway private network — unreachable from the public internet.
 
 **Queues:**
 
 | Queue | Worker file | Purpose | Concurrency |
 |-------|------------|---------|------------|
-| verify-queue | workers/verify.worker.ts | Hash chain + async event processing | 2 |
-| sla-queue | workers/sla.worker.ts | Art. 14 SLA breach detection | 1 |
-| retention-queue | workers/retention.worker.ts | Art. 19 daily purge cron (02:00 UTC) | 1 |
+| verify-queue | workers/verify.worker.ts | Hash chain + async event processing | 2 (prod) |
+| sla-queue | workers/sla.worker.ts | Art. 14 SLA breach detection | 1 (prod) |
+| retention-queue | workers/retention.worker.ts | Art. 19 daily purge cron (02:00 UTC) | 1 (prod) |
+
+**BullMQ polling (production-tuned to reduce Redis load):**
+
+| Setting | Value |
+|---------|-------|
+| drainDelay | 5000 ms |
+| stalledInterval | 60 000 ms |
 
 ---
 
