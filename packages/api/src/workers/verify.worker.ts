@@ -189,9 +189,16 @@ export function startWorker(redisConnection: IORedis): Worker<VerificationJobDat
   // Initialise SLA queue so processVerification can enqueue delayed escalation jobs
   slaQueue = new Queue<SlaJobData>(SLA_QUEUE_NAME, { connection: redisConnection });
 
+  const isProd = process.env.NODE_ENV === "production";
   const worker = new Worker<VerificationJobData>(QUEUE_NAME, processVerification, {
     connection: redisConnection,
-    concurrency: process.env.NODE_ENV === "production" ? 2 : 5,
+    concurrency: isProd ? 2 : 5,
+    // In production, poll every 5s when queue is empty instead of the 5ms default.
+    // This cuts Redis commands from ~200/s to ~0.2/s per worker (1000x reduction),
+    // staying well within Upstash's free tier limits.
+    drainDelay: isProd ? 5000 : 300,
+    // Check for stalled jobs every 60s (default: 30s) — halves stalled-check Redis usage.
+    stalledInterval: isProd ? 60_000 : 30_000,
   });
 
   worker.on("completed", (job) => {

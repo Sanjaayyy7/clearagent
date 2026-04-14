@@ -85,9 +85,14 @@ async function processSlaEscalation(job: Job<SlaJobData>): Promise<void> {
 }
 
 export function startSlaWorker(redisConnection: IORedis): Worker<SlaJobData> {
+  const isProd = process.env.NODE_ENV === "production";
   const worker = new Worker<SlaJobData>(SLA_QUEUE_NAME, processSlaEscalation, {
     connection: redisConnection,
-    concurrency: 3,
+    // SLA jobs are delayed — no benefit from high concurrency. 1 is sufficient.
+    concurrency: isProd ? 1 : 3,
+    // Poll every 5s when empty. SLA jobs are time-delayed so latency here is irrelevant.
+    drainDelay: isProd ? 5000 : 300,
+    stalledInterval: isProd ? 60_000 : 30_000,
   });
 
   worker.on("completed", (job) => {

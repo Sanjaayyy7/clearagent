@@ -96,9 +96,13 @@ async function processRetentionPurge(job: Job<RetentionJobData>): Promise<void> 
 }
 
 export function startRetentionWorker(redisConnection: IORedis): Worker<RetentionJobData> {
+  const isProd = process.env.NODE_ENV === "production";
   const worker = new Worker<RetentionJobData>(RETENTION_QUEUE_NAME, processRetentionPurge, {
     connection: redisConnection,
     concurrency: 1, // Single-threaded — retention is a batch operation, not time-critical
+    // Retention runs once daily — poll very infrequently. 30s is plenty.
+    drainDelay: isProd ? 30_000 : 5000,
+    stalledInterval: isProd ? 300_000 : 60_000, // Check for stalls every 5 min (daily job)
   });
 
   worker.on("completed", (job) => {

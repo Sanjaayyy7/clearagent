@@ -32,6 +32,11 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 // ─── Infrastructure ──────────────────────────────────────────
 const redisConnection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
   maxRetriesPerRequest: null,
+  // Disable TCP keepalive probes — saves Redis commands on idle connections.
+  // Upstash connection stays alive via TLS; no need for frequent pings.
+  enableAutoPipelining: false,
+  // BullMQ requires enableReadyCheck: false for serverless Redis (Upstash).
+  enableReadyCheck: false,
 });
 
 const verificationQueue = new Queue(QUEUE_NAME, {
