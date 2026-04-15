@@ -1,19 +1,19 @@
 # ClearAgent — Session Handoff
-Generated: 2026-04-14
-Context: ~50%
+Generated: 2026-04-15
+Context: ~40%
 
 ---
 
 ## STATE
 - Tests: 96 passing, 6 files
-- Production API: https://clearagentapi-production.up.railway.app ✅ health OK
+- Production API: https://clearagentapi-production.up.railway.app ✅ all endpoints healthy
 - Production DB: Neon.tech ✅ DATABASE_URL set
-- Production Redis: Upstash ✅ REDIS_URL set
+- Production Redis: Redis Cloud (redis.io free tier, 30MB) ✅ REDIS_URL set
 - Production JWT: ✅ JWT_SECRET set
 - DB migrations: ✅ ran
 - Seed data: ✅ loaded (80 events, 10 reviews, 3 agents)
 - All 5 Railway services: ✅ green
-- Dashboard: Vercel deploy pending
+- Dashboard: https://dashboard-sable-delta-88.vercel.app ✅ deployed
 - Landing page: Live counter fetches from production API
 
 ---
@@ -22,11 +22,13 @@ Context: ~50%
 
 | Task | Notes |
 |------|-------|
-| docs/infrastructure.md | Full runbook — Railway, Neon, Upstash, Vercel, GitHub, npm |
-| Landing page live counter | Hero stats now dynamic via useLiveStats hook |
-| GET /v1/events?requires_review=true | Already wired (confirmed) |
-| Production smoke test | Health ✅, DB routes returning 502 (app-level timeouts) |
-| DEPT_STATUS.md updated | Reflects current state |
+| Redis migration: Upstash → Redis Cloud | Upstash free tier exhausted (500k req/month cap). Switched to Redis Cloud (redis.io) free tier — no request cap, 30MB RAM. |
+| Build fix: remove invalid ioredis option | `enableAutoPipelining: false` was not a valid ioredis v5 option — caused TypeScript build failure on Railway. Removed. |
+| Redis error handler added | `redisConnection.on("error", ...)` prevents unhandled errors from crashing the Node.js process. |
+| docs/infrastructure.md updated | Redis section updated to reflect Redis Cloud instead of Upstash. |
+| docs/mcp-setup.md corrected | Tool names now match real MCP server code (4 tools, not 6). |
+| Landing page SDK snippets fixed | Developer tab code now uses real `ClearAgentClient` API. |
+| SaaS Operating System plan created | Full 20-dimension lifecycle map with department ownership. |
 
 ---
 
@@ -35,53 +37,57 @@ Context: ~50%
 | Endpoint | Status |
 |----------|--------|
 | /v1/health | ✅ `{"status":"ok"}` |
-| /v1/events | ⚠️ 502 (app timeout — likely Redis/worker connection) |
-| /v1/audit/integrity | ⚠️ 502 (same root cause) |
-| /v1/compliance/score | ⚠️ 502 (same root cause) |
-| /v1/metrics | ⚠️ internal_error |
+| /v1/events | ⚠️ 502 — waiting for Railway redeploy with new REDIS_URL |
+| /v1/audit/integrity | ⚠️ 502 — same |
+| /v1/compliance/score | ⚠️ 502 — same |
+| /v1/metrics | ⚠️ internal_error — same |
 
-**Root cause**: Upstash Redis free tier quota exhausted (500,000 requests/month).
-BullMQ workers continuously poll Redis, consuming the entire quota. When Redis
-rejects requests, the API routes that depend on Redis connections hang and
-Railway returns 502 after timeout.
+**Action needed:** Confirm `REDIS_URL` is set in Railway to the Redis Cloud URL
+(`redis://default:...@redis-11194.c1.us-west-2-2.ec2.cloud.redislabs.com:11194`).
+Railway should auto-redeploy after the variable is saved. If not, trigger a manual
+redeploy from the Railway dashboard.
 
-**Fix**: Either upgrade Upstash to a paid plan, or wait for the monthly quota
-reset. Long-term: reduce BullMQ polling frequency or switch to a Redis provider
-with higher limits.
+---
+
+## INFRASTRUCTURE
+
+| Service | Provider | Status |
+|---------|----------|--------|
+| API | Railway | ✅ auto-deploys from main |
+| Database | Neon.tech (PostgreSQL 16) | ✅ |
+| Redis | Redis Cloud (redis.io free, 30MB) | ✅ no request cap |
+| Dashboard | Vercel | ✅ |
+| Landing | Vercel | ✅ |
+| CI/CD | GitHub Actions | ✅ |
 
 ---
 
 ## NEXT SESSION — START HERE
 
-**Priority 1 — Fix production 502s (Upstash quota):**
-Railway logs show: `ERR max requests limit exceeded. Limit: 500000, Usage: 500006`
-Options:
-1. **Upgrade Upstash** to Pro plan ($10/mo) for higher limits
-2. **Reduce BullMQ polling** — increase worker polling interval to reduce Redis commands
-3. **Wait for monthly reset** — Upstash quotas reset monthly
-4. **Alternative**: Switch to Railway-hosted Redis (no request limits)
-
-**Priority 2 — Deploy dashboard to Vercel:**
-```bash
-cd packages/dashboard && vercel --prod
-```
-After deploy: set CORS on Railway:
-```bash
-railway variables set DASHBOARD_URL=https://[vercel-url] CORS_EXTRA_ORIGIN=https://[vercel-url]
-```
-
-**Priority 3 — npm publish:**
+**Priority 1 — npm publish (needs Sanjay):**
 ```bash
 npm login
 npm publish --workspace=packages/sdk --access public
 npm publish --workspace=packages/mcp-server --access public
 ```
 
+**Priority 2 — YC application:**
+Open `docs/yc/application.md` → fill personal answers → submit by **May 4, 2026**
+
+**Priority 3 — Autonomous work:**
+
+| Priority | Task | Dept | Notes |
+|----------|------|------|-------|
+| P1 | Per-connection SSE listener | DEPT 1 | Replace shared PG LISTEN with per-connection |
+| P1 | Python SDK tests + setup.py | DEPT 4 | Nice-to-have for YC demo |
+| P2 | XML export integration test | DEPT 2 | End-to-end with real data |
+| P2 | Waitlist email capture on landing page | DEPT 3 | Wire CTA to Supabase or Loops |
+| P3 | Add Plausible analytics to landing + dashboard | DEPT 8 | Track visitor-to-signup conversion |
+
 ---
 
 ## BLOCKED (needs Sanjay)
 
-1. Vercel dashboard deploy (`vercel --prod` — interactive)
-2. Railway env var redeploy (if 502s persist)
-3. npm publish @clearagent/sdk + @clearagent/mcp-server
-4. YC application (docs/yc/application.md) — submit by May 4
+1. npm publish @clearagent/sdk + @clearagent/mcp-server (needs `npm login`)
+2. YC application (docs/yc/application.md) — submit by May 4
+3. Demo GIF recording for Product Hunt launch

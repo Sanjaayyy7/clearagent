@@ -1,20 +1,20 @@
 # ClearAgent Department Status
-Last updated: 2026-04-14
+Last updated: 2026-04-15
 Total LOC: 8,781 | Files: 146 | Commits: 39 | Tests: 96 (src-only)
 
 ---
 
 ## CURRENT SPRINT
 Sprint 2: April 24 – May 7, 2026
-YC Deadline: May 4, 2026 (23 days)
-EU AI Act: 113 days to enforcement
+YC Deadline: May 4, 2026 (19 days)
+EU AI Act: 109 days to enforcement
 
 ---
 
 ## SYSTEM STATE
 - Production API: https://clearagentapi-production.up.railway.app ✅ (health OK)
 - Production DB: Neon.tech — DATABASE_URL set ✅
-- Production Redis: Upstash — REDIS_URL set ✅
+- Production Redis: Redis Cloud (redis.io free tier, 30MB, no request cap) — REDIS_URL set ✅
 - Production JWT: JWT_SECRET set ✅
 - Dashboard: https://dashboard-sable-delta-88.vercel.app ✅ (deployed to Vercel)
 - CORS: DASHBOARD_URL + CORS_EXTRA_ORIGIN set on Railway ✅
@@ -120,8 +120,11 @@ CURRENT: Monitoring production stability
 BLOCKED: none
 COMPLETED:
 - DATABASE_URL set in Railway ✅
-- REDIS_URL set in Railway ✅
+- REDIS_URL set in Railway ✅ (migrated Upstash → Redis Cloud free tier)
 - JWT_SECRET set in Railway ✅
+- Redis migration: Upstash → Redis Cloud (redis.io) — no request cap, 30MB free
+- Build fix: removed invalid `enableAutoPipelining` ioredis option
+- Added Redis error handler to prevent unhandled crash
 - DASHBOARD_URL + CORS_EXTRA_ORIGIN set in Railway ✅
 - railway run npm run db:migrate — ran successfully
 - railway run npm run seed — ran successfully (80 events seeded)
@@ -173,3 +176,5 @@ COMPLETED:
 | vitest runs dist/ + src/ tests (duplicate) | vitest.config.ts missing include/exclude | Add include: src/**/*.test.ts | 1f30568 |
 | SLA worker contentHash not SHA-256 | Raw string template instead of sha256() | sha256(system-escalation\|...) | 39262d2 |
 | Production 502 on all DB routes | DATABASE_URL not set in Railway API service env vars | Add DATABASE_URL in Railway dashboard | ✅ Fixed |
+| Production 502 on Redis-dependent routes | Upstash free tier exhausted (500k req/month) | Migrated to Redis Cloud (redis.io) free tier — no request cap | ✅ Fixed |
+| Railway build failure (enableAutoPipelining) | Invalid ioredis v5 option caused tsc error | Removed option + added error handler | d6254ef |

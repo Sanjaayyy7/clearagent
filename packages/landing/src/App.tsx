@@ -754,32 +754,30 @@ npm install @clearagent/sdk
 # Configure environment
 export CLEARAGENT_API_KEY="ca_live_..."
 export CLEARAGENT_ORG_ID="org_..."`,
-  Initialize: `import { ClearAgent } from '@clearagent/sdk';
+  Initialize: `import { ClearAgentClient } from '@clearagent/sdk';
 
-const agent = new ClearAgent({
+const ca = new ClearAgentClient({
   apiKey: process.env.CLEARAGENT_API_KEY,
-  orgId: process.env.CLEARAGENT_ORG_ID,
+  baseUrl: 'https://your-api.railway.app',
 });
 
-const { agentId } = await agent.register({
+const { agentId, apiKey } = await ca.agents.register({
   name: 'payment-processor',
   externalId: 'agent_prod_001',
   modelProvider: 'openai',
   modelId: 'gpt-4o',
 });`,
   Verify: `// Verify an agent decision
-const { jobId } = await agent.verify({
-  agentId,
+const { jobId } = await ca.events.verify({
   eventType: 'financial_transfer',
   input: { amount: 9500, currency: 'USD', recipient: 'vendor_abc' },
 });
 
-const result = await agent.poll(jobId);
+const result = await ca.jobs.poll(jobId);
 // → {
 //   status: 'completed',
 //   requiresReview: true,
 //   contentHash: 'sha256:a3f4...',
-//   prevHash: 'sha256:9e1b...',
 // }`,
 };
 

@@ -18,8 +18,8 @@ Last updated: April 2026
 │  └──────────────┘  └──────┬───────┘  └───────────┘     │
 │                           │                             │
 │                    ┌──────▼───────┐                     │
-│                    │   Upstash    │                     │
-│                    │    Redis     │                     │
+│                    │ Redis Cloud  │                     │
+│                    │  (redis.io)  │                     │
 │                    │   (BullMQ)   │                     │
 │                    └──────────────┘                     │
 └─────────────────────────────────────────────────────────┘
@@ -44,7 +44,7 @@ Last updated: April 2026
 | Variable | Description |
 |---|---|
 | DATABASE_URL | Neon.tech PostgreSQL connection string |
-| REDIS_URL | Upstash Redis TLS connection string |
+| REDIS_URL | Redis Cloud connection string (`redis://default:...@host:port`) |
 | JWT_SECRET | 32-byte hex secret for agent attestation |
 | NODE_ENV | production |
 | PORT | 3000 |
@@ -119,13 +119,13 @@ railway run npm run seed --workspace=packages/api
 
 ---
 
-### 3. Railway Redis — Queue & Cache
+### 3. Redis Cloud — Queue & Cache
 
-- **Provider**: Railway (Docker service — `redis:7-alpine`, same project)
-- **Internal URL**: `redis://redis.railway.internal:6379` (private network, no TLS, no auth)
-- **Connection**: `REDIS_URL` env var on the `@clearagent/api` service
+- **Provider**: Redis Cloud (redis.io) — free tier, 30 MB RAM, 50 connections
+- **Endpoint**: `redis-11194.c1.us-west-2-2.ec2.cloud.redislabs.com:11194`
+- **Connection**: `REDIS_URL` env var on the `@clearagent/api` service (`redis://default:PASSWORD@host:port`)
 - **Used for**: BullMQ job queues
-- **Note**: No request quotas, no third-party dependency. Runs on the Railway private network — unreachable from the public internet.
+- **Note**: No request-per-month cap (unlike Upstash). Free tier has no persistence — data is lost on restart, which is acceptable for BullMQ job queues (jobs are also tracked in PostgreSQL `jobs` table).
 
 **Queues:**
 

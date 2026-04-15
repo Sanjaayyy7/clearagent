@@ -60,12 +60,10 @@ Once connected, Claude can use these tools:
 
 | Tool | Description |
 |------|-------------|
-| `verify_agent_action` | Submit an agent action for cryptographic verification and audit logging |
-| `get_audit_trail` | Retrieve the tamper-evident event chain for an agent |
-| `check_compliance_score` | Get real-time EU AI Act compliance score (Art. 12/14/19) |
-| `list_pending_reviews` | List agent decisions awaiting human review |
-| `approve_review` | Approve or reject a flagged agent decision |
-| `get_agent_status` | Check registration and suspension status of an agent |
+| `clearagent_verify` | Submit an AI agent decision for verification. Creates a hash-chained audit trail entry (Art. 12). Returns a `jobId`. |
+| `clearagent_poll` | Poll for the result of a verification job. Returns `eventId`, `contentHash`, and whether human review is required (Art. 14). |
+| `clearagent_audit_integrity` | Verify hash chain integrity. Recomputes the SHA-256 Merkle root and reports whether any record has been tampered with (Art. 12 + 19). |
+| `clearagent_submit_review` | Submit a human review for a flagged event. Justification must be at least 10 characters (Art. 14). |
 
 ## Environment Variables
 
@@ -79,11 +77,11 @@ Once connected, Claude can use these tools:
 
 After connecting, ask Claude:
 
-> "Use ClearAgent to verify that our procurement agent just approved a $50,000 contract with supplier XYZ — log the decision with full reasoning."
+> "Use clearagent_verify to log that our procurement agent just approved a $50,000 contract with supplier XYZ — include the full reasoning."
 
-> "Show me the compliance score for our AI systems and what gaps need fixing before the August 2026 EU AI Act deadline."
+> "Run clearagent_audit_integrity to check whether our hash chain is intact."
 
-> "List all agent decisions flagged for human review in the last 24 hours."
+> "Use clearagent_submit_review to approve event abc-123 — the decision was correct and within policy."
 
 ## Health Check
 
