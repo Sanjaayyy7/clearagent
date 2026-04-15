@@ -206,6 +206,17 @@ waitForDatabase().then(() => {
     logger.info({ port: PORT }, "ClearAgent API server running");
     logger.info(`Verification worker started (concurrency: ${isProd ? 2 : 5})`);
   });
+
+  // Neon free tier pauses compute after 5 min inactivity. A 3-min ping keeps it warm.
+  if (isProd) {
+    setInterval(async () => {
+      try {
+        await db.execute(sqlExpr`SELECT 1`);
+      } catch (err) {
+        logger.warn({ err: (err as Error).message }, "Neon keepalive ping failed");
+      }
+    }, 3 * 60 * 1000);
+  }
 }).catch((err) => {
   logger.error({ err: (err as Error).message }, "Startup failed");
   process.exit(1);
