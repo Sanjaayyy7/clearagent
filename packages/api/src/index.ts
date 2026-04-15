@@ -140,32 +140,6 @@ app.get("/v1/metrics", async (_req, res, next) => {
   }
 });
 
-// ─── DB diagnostic (temporary — remove after production is stable) ────
-app.get("/v1/debug/db", async (_req, res) => {
-  const results: Record<string, unknown> = {};
-  try {
-    await db.execute(sqlExpr`SELECT 1 AS ping`);
-    results.ping = "ok";
-  } catch (err) {
-    results.ping = (err as Error).message;
-  }
-  try {
-    const [row] = await db.select({ count: sqlExpr<number>`count(*)::int` }).from(schema.verificationEvents);
-    results.events_count = row?.count ?? 0;
-  } catch (err) {
-    results.events_query = (err as Error).message;
-  }
-  try {
-    const tables = await db.execute(sqlExpr`SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`);
-    results.tables = tables;
-  } catch (err) {
-    results.tables_query = (err as Error).message;
-  }
-  results.node_env = process.env.NODE_ENV ?? "(not set)";
-  results.db_url_prefix = (process.env.DATABASE_URL ?? "").slice(0, 30) + "...";
-  res.json(results);
-});
-
 // ─── Error handler ───────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ err: err.message, stack: err.stack }, "Unhandled error");
