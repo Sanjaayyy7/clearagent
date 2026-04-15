@@ -103,6 +103,10 @@ export function startSlaWorker(redisConnection: IORedis): Worker<SlaJobData> {
     logger.error({ jobId: job?.id, err: err.message }, "SLA job failed");
   });
 
+  worker.on("error", (err) => {
+    logger.error({ err: err.message }, "SLA worker error");
+  });
+
   return worker;
 }
 

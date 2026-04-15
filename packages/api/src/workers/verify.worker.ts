@@ -209,5 +209,9 @@ export function startWorker(redisConnection: IORedis): Worker<VerificationJobDat
     logger.error({ jobId: job?.id, err: err.message }, "Job failed");
   });
 
+  worker.on("error", (err) => {
+    logger.error({ err: err.message }, "Verify worker error");
+  });
+
   return worker;
 }

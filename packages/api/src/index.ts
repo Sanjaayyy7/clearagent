@@ -152,6 +152,8 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 // ─── Start ───────────────────────────────────────────────────
+const isProd = process.env.NODE_ENV === "production";
+
 // Verify worker starts immediately — handles inbound requests
 const worker = startWorker(redisConnection);
 
@@ -159,8 +161,8 @@ const worker = startWorker(redisConnection);
 let slaWorker: ReturnType<typeof startSlaWorker>;
 let retentionWorker: ReturnType<typeof startRetentionWorker>;
 
-const SLA_DELAY = process.env.NODE_ENV === "production" ? 10_000 : 0;
-const RETENTION_DELAY = process.env.NODE_ENV === "production" ? 20_000 : 0;
+const SLA_DELAY = isProd ? 10_000 : 0;
+const RETENTION_DELAY = isProd ? 20_000 : 0;
 
 setTimeout(() => {
   slaWorker = startSlaWorker(redisConnection);
@@ -173,9 +175,40 @@ setTimeout(() => {
   logger.info("Retention purge worker started (daily 02:00 UTC)");
 }, RETENTION_DELAY);
 
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, "ClearAgent API server running");
-  logger.info(`Verification worker started (concurrency: ${process.env.NODE_ENV === "production" ? 2 : 5})`);
+// Wait for Neon to wake up before accepting traffic.
+// Neon free tier pauses compute after inactivity; the first connection after a
+// Railway deploy can fail while Neon resumes. Retrying here prevents cold-start
+// 500/502s on all DB-dependent routes.
+async function waitForDatabase(): Promise<void> {
+  const MAX_RETRIES = 6;
+  const RETRY_DELAY_MS = 5_000;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await db.execute(sqlExpr`SELECT 1`);
+      logger.info("Database connectivity verified");
+      return;
+    } catch (err) {
+      const isLast = attempt === MAX_RETRIES;
+      logger.warn(
+        { attempt, maxRetries: MAX_RETRIES, err: (err as Error).message },
+        isLast
+          ? "Database unavailable after all retries — exiting"
+          : "Database ping failed — Neon may be waking up, retrying"
+      );
+      if (isLast) process.exit(1);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
+}
+
+waitForDatabase().then(() => {
+  app.listen(PORT, () => {
+    logger.info({ port: PORT }, "ClearAgent API server running");
+    logger.info(`Verification worker started (concurrency: ${isProd ? 2 : 5})`);
+  });
+}).catch((err) => {
+  logger.error({ err: (err as Error).message }, "Startup failed");
+  process.exit(1);
 });
 
 // Graceful shutdown

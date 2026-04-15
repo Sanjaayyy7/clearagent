@@ -113,6 +113,10 @@ export function startRetentionWorker(redisConnection: IORedis): Worker<Retention
     logger.error({ jobId: job?.id, err: err.message }, "Retention purge job failed");
   });
 
+  worker.on("error", (err) => {
+    logger.error({ err: err.message }, "Retention worker error");
+  });
+
   return worker;
 }
 
